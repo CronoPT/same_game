@@ -1,0 +1,96 @@
+
+Informacao sobre utilizacao
+---------------------------
+
+No ficheiro "procura.lisp" estao definidos alguns algoritmos de
+procura para serem utilizados na cadeira de Tecnicas de Procura.
+
+Estao implementados algoritmos de procura nao-informada e algoritmos
+de procura informada.
+
+Os algoritmos de procura nao-informada implementados sao os seguintes:
+- Procura em largura primeiro
+- Procura em profundidade primeiro
+- Procura em profundidade iterativa
+
+Os algoritmos de procura informada implementados foram:
+- Procura A*
+- Procura IDA*
+
+
+
+Para poder utilizar os algoritmos implementados precisam de:
+
+1. Compilar o ficheiro com o codigo Lisp
+
+     (compile-file "procura.lisp")
+
+2. Carregar o ficheiro compilado
+
+     (load "procura")
+
+3. Criar um problema, usando para isso a funcao 
+
+     (cria-problema <estado inicial> 
+                    <lista de operadores>
+                    :objectivo? <funcao que testa o estado final>
+                    :estado= <funcao de igualdade>
+                    :hash <funcao que da' o valor de hashing para um estado>
+                    :custo <funcao que da' o custo de geracao de um estado>
+                    :heuristica <funcao que avalia um estado>)
+
+   O parametro de keyword :custo corresponde a uma funcao que recebe
+   um estado e devolve o seu custo de geracao, ou seja, o custo da
+   transicao do seu pai para ele.  Esta funcao apenas e' usada nos
+   algoritmos de procura informados A* e IDA* para computar o valor de
+   "g" de cada no'.  Por omissao, este parametro toma como valor uma
+   funcao que devolve sempre 1.
+
+4. Resolver o problema criado de acordo com o ponto 3, usando a funcao
+
+     (procura <problema> 
+              <tipo de procura>
+              :profundidade-maxima <inteiro>
+              :espaco-em-arvore? <t ou nil>)
+
+   O parametro <tipo de procura> pode ser qualquer um da seguinte
+   lista (largura profundidade profundidade-iterativa a* ida*).
+
+   A keyword profundidade-maxima so' faz sentido para os algoritmos de
+   profundidade e profundidade-iterativa, sendo opcional mesmo assim.
+
+   A keyword espaco-em-arvore? indica aos algoritmos de procura se o
+   espaco de estados do problema que esta' a ser resolvido e' uma
+   arvore em vez de um grafo.  Se assim for, os algoritmos podem usar
+   essa informacao para funcionar mais depressa.
+
+   Por exemplo, para resolver um problema criado anteriormente usando
+   a procura em largura primeiro, bastaria avaliar
+
+     (procura prob1 'largura)
+
+   e, para a procura em profundidade primeiro com o limite de
+   profundidade 4
+
+     (procura prob1 'profundidade :profundidade-maxima 4)
+
+   Esta funcao devolve uma lista de quatro elementos, pela ordem
+   seguinte:
+
+     - Solucao encontrada para o problema (lista de estados desde o
+       estado inicial ate' ao estado final), ou NIL caso nao encontre
+       solucao.
+
+     - Tempo gasto na procura.  Este valor e' obtido a partir da funcao
+       get-internal-run-time.  Para obter valores em segundos, deve
+       dividir este valor pela constante internal-time-units-per-second.
+
+     - Numero de nos expandidos durante a procura.
+
+     - Numero de nos gerados durante a procura.
+     
+
+             -------------------- X --------------------
+
+
+ 
