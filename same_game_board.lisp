@@ -23,11 +23,11 @@
 )
 
 (defun set_pos (lst l c val)
-    (setf (nth l (nth c lst)) val)
+    (setf (nth c (nth l lst)) val)
 )
 
 (defun get_pos (lst l c)
-    (nth l (nth c lst))
+    (nth c (nth l lst))
 )
 
 (defun do_action_tail (board l c)
@@ -60,17 +60,65 @@
     )
 )
 
-(defun apply_gravity_down (board pos_changed)
+(defun bring_down_from (board pos_changed)
+    (let ((l (first pos_changed))
+        (c (second pos_changed)))
+        (if (> l 0)
+            (progn
+                (set_pos board l c (get_pos board (- l 1) c))
+                (set_pos board (- l 1) c nil)
+                (bring_down_from board (list (- l 1) c))
+            )
+        )
+    )
+)
 
+(defun apply_gravity_down (board pos_changed)
+    (if (not (null pos_changed))
+        (progn
+            (bring_down_from    board (first pos_changed))
+            (apply_gravity_down board (rest pos_changed))
+        )
+    )
+    board
+)
+
+(defun bring_column_foward (board mov_col)
+    (let ((lines (length board)) 
+        (columns (length (first board))))
+        (loop for c from mov_col to (- columns 1) doing
+            (loop for l from 0 to (- lines 1) doing
+                (if (< c (- columns 1))
+                    (progn 
+                        (set_pos board l c (get_pos board l (+ c 1)))
+                        (set_pos board l (+ c 1) nil)
+                    )
+                )
+            )
+        )
+    )
 )
 
 (defun apply_gravity_left (board)
-
+    (let ((lines (length board)) 
+        (columns (length (first board))))
+        (loop for c from 0 to (- columns 1)
+            do (if (null (get_pos board (- lines 1) c))
+                (progn
+                    (bring_column_foward board c)
+                    ;; (if (null (get_pos board (- lines 1) c))
+                    ;;     (setf c (- c 1))
+                    ;; )
+                ) 
+            )
+        )
+    )
 )
 
 (defun do_action (board position)
     (let ((pos_changed (do_action_tail board (first position) (second position))))
         (apply_gravity_down board pos_changed)
+        (print_board board)
         (apply_gravity_left board)
     )
     (fresh-line)
@@ -109,4 +157,4 @@
 ;;     )
 ;; )
 
-(do_action '((1 2 2 3 3) (2 2 2 1 3) (1 2 2 2 2) (1 1 1 1 1)) '(1 0))
+;; (do_action '((1 2 2 3 3) (2 2 2 1 3) (1 2 2 2 2) (1 1 1 1 1)) '(1 0))
