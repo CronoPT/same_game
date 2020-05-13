@@ -74,6 +74,7 @@
 )
 
 (defun apply_gravity_down (board pos_changed)
+    (sort pos_changed (lambda (pos1 pos2) (< (first pos1) (first pos2))))
     (if (not (null pos_changed))
         (progn
             (bring_down_from    board (first pos_changed))
@@ -100,17 +101,12 @@
 )
 
 (defun apply_gravity_left (board)
-    (let ((lines (length board)) 
-        (columns (length (first board))))
-        (loop for c from 0 to (- columns 1)
-            do (if (null (get_pos board (- lines 1) c))
-                (progn
-                    (bring_column_foward board c)
-                    ;; (if (null (get_pos board (- lines 1) c))
-                    ;;     (setf c (- c 1))
-                    ;; )
-                ) 
-            )
+    (let* ((lines (length board)) 
+        (columns (length (first board)))
+        (null_cols (loop for c from (- columns 1) downto 0 
+                        when (null (get_pos board (- lines 1) c)) collect c)))
+        (loop for c in null_cols do
+            (bring_column_foward board c)
         )
     )
 )
@@ -157,4 +153,6 @@
 ;;     )
 ;; )
 
-;; (do_action '((1 2 2 3 3) (2 2 2 1 3) (1 2 2 2 2) (1 1 1 1 1)) '(1 0))
+
+(defvar boardinho '((1 2 2 3 3) (2 2 2 1 3) (1 2 2 2 2) (1 1 1 1 1)))
+(do_action boardinho '(1 0))
