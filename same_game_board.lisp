@@ -93,12 +93,13 @@
 ;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Recursively removes adjancent pieces of the same color from the board
-;;
+;; Recursively removes adjancent pieces of the same color, clusters, 
+;;  from the board
+;;  
 (defun remove_cluster (board l c) 
     (let(   (lines   (length board))
             (columns (length (first board)))
-            (color (get_pos board l c))
+            (color (get_pos board l c)) 
             (pos_changed (list  (list l c))))
         (set_pos board l c nil)
         ;Propagate changes
@@ -270,15 +271,6 @@
     possible_actions
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; This is the function that gets the checked_actions board and a list of
-;; positons of a cluster and sets it all to null
-;; ! I don't think I need this. 
-(defun mark_check_actions (checked_actions cluster_positions)
-    (loop for pos in cluster_positions do
-      (set_pos checked_actions (first pos) (second pos) nil)))
-
 ;************************************************************************
 ;*                       BOARD - MAIN OPERATIONS                        *
 ;************************************************************************
@@ -341,10 +333,11 @@
 
 
 (defun isItGoal (board)
+    (print board)
     (loop for l in board do
       (loop for c in l do
-        (if (not (null c))
-            (return nil))))
+         (if (not (null c))
+             (return-from isItGoal nil))))    
     T
 )
 
@@ -416,21 +409,22 @@
 
 
 
-;! TO'S TESTING
+;! SOLVING PROBLEM WITH BFS EXAMPLE
 
 (defvar boardinho'((1 2 2 3 3) 
                    (2 2 2 1 3) 
                    (1 2 2 2 2) 
                    (1 1 1 1 1)))
                    
-(print_list_board (generate_successors boardinho))
 
-;(cria-problema boardinho '(generate_successors))
 
-;; (defun cria-problema (estado-inicial operadores 
-;; 		      &key estado-final
-;; 			   objectivo?
-;; 			   custo
-;; 			   heuristica
-;; 			   (hash #'sxhash)
-;; 			   (estado= #'eql))
+
+(setf problema (cria-problema boardinho '(generate_successors) :objectivo? #'isItGoal))
+
+
+(print "SPAM BEGINS")
+(setf A (procura problema 'largura))
+(terpri)
+(print "RESULTS")
+(terpri)
+(print_list_board (first A))
