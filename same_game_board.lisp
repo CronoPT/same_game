@@ -1,8 +1,9 @@
 ;(in-package :user)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; AUXILIARY FUNCTIONS FOR BOARD
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Prints a board line, nill positions are displayed with a '_'
+;;
 (defun print_line (line)
     (if (not (null line))
         (progn
@@ -16,6 +17,10 @@
     )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Prints the board
+;;
 (defun print_board (board)
     (if (not (null board))
         (progn
@@ -25,31 +30,32 @@
     )
 )
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Set the content in the board at position (l, c) with val
+;;
 (defun set_pos (lst l c val)
     (setf (nth c (nth l lst)) val)
 )
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Get the content in the board at position (l, c)
+;;
 (defun get_pos (lst l c)
     (nth c (nth l lst))
 )
 
 
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; ALL PIECES THAT WILL GET REMOVED
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Recursively removes adjancent pieces of the same color from the board
+;;
 (defun do_action_tail (board l c) 
-    (let 
-        ( 
-            (lines   (length board))
+    (let(   (lines   (length board))
             (columns (length (first board)))
             (color (get_pos board l c))
-            (pos_changed (list  (list l c)))
-        )
+            (pos_changed (list  (list l c))))
         (set_pos board l c nil)
         ;Propagate changes
         (if (< l (- lines 1)) ;are we before the down limit?
@@ -76,14 +82,13 @@
     )
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; FUNCTIONS TO BRING DOWN ELEMENTS
-;      pos_changed -> (l,c)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Shifts down all positions in a given column starting at pos_changed
+;;
 (defun bring_down_from (board pos_changed)
-    (let ((l (first pos_changed))
-        (c (second pos_changed)))
+    (let(   (l (first pos_changed))
+            (c (second pos_changed)))
         (if (< 0 l) ;recursively call this until we brought everything down
             (progn
                 (set_pos board l c (get_pos board (- l 1) c))   
@@ -94,63 +99,110 @@
     )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Applies down gravity to the board, i.e. all pieces that do not have
+;; pieces bellow will fall
+;;
 (defun apply_gravity_down (board pos_changed)
     (sort pos_changed (lambda (pos1 pos2) (< (first pos1) (first pos2)))) ;ordena por linhas
     (if (not (null pos_changed))   
         (progn
             (bring_down_from    board (first pos_changed)) ;bring first down
-            (apply_gravity_down board (rest pos_changed))  ;bring the rest down
+            (apply_gravity_down board (rest  pos_changed)) ;bring the rest down
         )
     )
     board
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun bring_column_foward (board mov_col)
-    (let ((lines (length board)) 
-        (columns (length (first board))))
-        (loop for c from mov_col to (- columns 1) doing
-            (loop for l from 0 to (- lines 1) doing
-                (if (< c (- columns 1))
-                    (progn 
-                        (set_pos board l c (get_pos board l (+ c 1)))
-                        (set_pos board l (+ c 1) nil)
-                    )
-                )
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; This function collects a list with all the colums that are not null 
+;; It is recursive and it appends those columns in fullcols
+;; c is the current column the function is looking at. If it is empty, we pass. 
+;; If it's not, we add.
+;;
+;; If we want to collect all nonempty columns: (collect_full_cols board '()' 0) 
+;;
+(defun collect_full_cols (board full_cols c) 
+    (let(   (lines (length board)) 
+            (columns (length (first board))))
+        (if (eq c columns)
+            full_cols
+            (if (not (null (get_pos board (- lines 1) c)))
+                (collect_full_cols board (append full_cols (list c) ) (+ c 1))
+                (collect_full_cols board full_cols (+ c 1))
             )
         )
     )
 )
 
-(defun apply_gravity_left (board)
-    (let* ((lines (length board)) 
-        (columns (length (first board)))
-        (null_cols (loop for c from (- columns 1) downto 0 
-                        when (null (get_pos board (- lines 1) c)) collect c))) ;collects all columns whose values in the bottom are nil
-        (loop for c in null_cols do
-            (bring_column_foward board c)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; It moves column number init_col to dest_col.
+;; in the end, init_col is full of nils
+;; line is just an auxiliary variable to remember which line we are.
+;; if we want to move colum 2 to position 1: (move_col_aux board 1 2 0)
+;;
+(defun move_col_aux(board dest_col init_col line)
+    (let(   (lines (length board)))
+        (if (not (eq line lines))
+            (progn 
+                (set_pos board line dest_col (get_pos board line init_col))
+                (set_pos board line init_col nil)
+                (move_col_aux board dest_col init_col (+ line 1))
+            )
         )
-        ;(print_board board)
+    )
+    ;)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Moves the column numbered with init_col dest_col
+;;
+(defun move_col (board dest_col init_col)
+    (move_col_aux board dest_col init_col 0)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; We iterate over the columns (recursively using current_col to store the current one)
+;; when we find a nil column we go to our list of full columns and swap it to our current empty column
+;; we now remove the just transplanted full colum.
+;;
+(defun apply_gravity_left_aux (board full_cols_list current_col)
+    (if (null full_cols_list)
+        board
+        (let
+            ((lines (length board)))
+            (progn
+                (if (null (get_pos board (- lines 1) current_col))
+                    (move_col board current_col (car full_cols_list))
+                )
+                (apply_gravity_left_aux board (cdr full_cols_list) (+ current_col 1))
+            )
+        )
     )
 )
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Applies left gravity to the board, i.e. compact all columns to the
+;; left og the board
+;;
+(defun apply_gravity_left (board)
+    (apply_gravity_left_aux board (collect_full_cols board '()' 0) 0)
+)
 
-
-
-
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Apply the action resulting of tapping position to the board
+;;
 (defun do_action (board position)
-    (let ((pos_changed (do_action_tail board (first position) (second position))))
+    (let (  (pos_changed (do_action_tail board (first position) (second position))))
         (apply_gravity_down board pos_changed)
         (apply_gravity_left board)
     )
@@ -158,72 +210,64 @@
     (print_board board)
 )
 
+;; 10x4 board with 3 colors
+(defvar b1 '((2 1 3 2 3 3 2 3 3 3) 
+             (1 3 2 2 1 3 3 2 2 2) 
+             (1 3 1 3 2 2 2 1 2 1) 
+             (1 3 3 3 1 3 1 1 1 3)))
 
+;; 10x4 board with 5 colors 
+(defvar b2 '((4 3 3 1 2 5 1 2 1 5) 
+             (2 4 4 4 1 5 2 4 1 2)
+             (5 2 4 1 4 5 1 2 5 4)
+             (1 3 1 4 2 5 2 5 4 5)))
 
-;; (defun possible_action (board position)
-;;     (let ((lines   (length board))
-;;             (columns (length (first board)))
-;;             (l (first  position))
-;;             (c (second position))
-;;             (color (get_pos board l c))
-;;             ((get_pos board l c) nil)
-;;             (adj_same_color 0))
-;;         (if (<= l (+ lines 1))
-;;             (if (eq color (get_pos board (+ l 1) c ))
-;;                 (+ adj_same_color 1)
-;;             )
-;;         )
-;;         (if (>= 0 (- lines 1))
-;;             (if (eq color (get_pos board (- l 1) c))
-;;                 (+ adj_same_color 1)
-;;             )
-;;         )
-;;         (if (<= c (+ columns 1))
-;;             (if (eq color (get_pos board l (+ c 1)))
-;;                 (+ adj_same_color 1)
-;;             )
-;;         )
-;;         (if (>= 0 (- columns 1))
-;;             (if (eq color (get_pos board l (- c 1)))
-;;                 (+ adj_same_color 1)
-;;             )
-;;         )
-;;         (>= adj_same_color 2)
-;;     )
-;; )
+;; 15x10 board with 3 colors
+(defvar b3 '((3 3 3 2 1 2 3 1 3 1)
+             (1 1 2 3 3 1 1 1 3 1)
+             (3 3 1 2 1 1 3 2 1 1)
+             (3 3 2 3 3 1 3 3 2 2)
+             (3 2 2 2 3 3 2 1 2 2)
+             (3 1 2 2 2 2 1 2 1 3)
+             (2 3 2 1 2 1 1 2 2 1)
+             (2 2 3 1 1 1 3 2 1 3)
+             (1 3 3 1 1 2 3 1 3 1) 
+             (2 1 2 2 1 3 1 1 2 3)
+             (2 1 1 3 3 3 1 2 3 1)
+             (1 2 1 1 3 2 2 1 2 2)
+             (2 1 3 2 1 2 1 3 2 3)
+             (1 2 1 3 1 2 2 3 2 3)
+             (3 3 1 2 3 1 1 2 3 1)))
 
+;; 15x10 board with 5 colors
+(defvar b4 '((5 1 1 1 2 1 4 2 1 2)
+             (5 5 5 4 1 2 2 1 4 5)
+             (5 5 3 5 5 3 1 5 4 3)
+             (3 3 3 2 4 3 1 3 5 1)
+             (5 3 4 2 2 2 2 1 3 1)
+             (1 1 5 3 1 1 2 5 5 5)
+             (4 2 5 1 4 5 4 1 1 1)
+             (5 3 5 3 3 3 3 4 2 2)
+             (2 3 3 2 5 4 3 4 4 4)
+             (3 5 5 2 2 5 2 2 4 2)
+             (1 4 2 3 2 4 5 5 4 2)
+             (4 1 3 2 4 3 4 4 3 1)
+             (3 1 3 4 4 1 5 1 5 4) 
+             (1 3 1 5 2 4 4 3 3 2)
+             (4 2 4 2 2 5 3 1 2 1)))
 
-;(defvar boardinho '((1 2 2 3 3) (2 2 2 1 3) (1 2 2 2 2) (1 1 1 1 1))
-;)
+(do_action b1 '(1 0))
+(print_board b1)
+(terpri)
 
+(do_action b2 '(0 1))
+(print_board b2)
+(terpri)
 
-;(print_board boardinho)
+(do_action b3 '(12 9))
+(print_board b3)
+(terpri)
 
-;(format t "hey1~%")
-
-;(do_action boardinho '(1 1))
-
-;
-;(format t "~%")
-
-;(do_action boardinho '(1 4))
-
-
-
-
-
-(defvar b1 '((1 2 nil 3 3) (2 2 nil 1 3) (1 2 nil 2 2) (1 1 nil 1 1))
-)
-
-(defvar b2 '((1 2 nil nil nil 3 4 nil 5 ) (1 2 nil nil nil 3 4 nil 5 ) (1 2 nil nil nil 3 4 nil 5 ) (1 2 nil nil nil 3 4 nil 5 ))
-)
-
-(defvar b3'((1 2 nil nil nil 3 4 nil nil ) (1 2 nil nil nil 3 4 nil nil ) (1 2 nil nil nil 3 4 nil nil ) (1 2 nil nil nil 3 4 nil nil ))
-)
-
-(defvar b4'((nil 2 nil nil nil 3 4 nil nil ) (nil 2 nil nil nil 3 4 nil nil ) (nil 2 nil nil nil 3 4 nil nil ) (nil 2 nil nil nil 3 4 nil nil ))
-)
-
-
-;(print "hello")
-(print (apply_gravity_left b4))
+(do_action b4 '(14 3))
+(print_board b4)
+(terpri)
