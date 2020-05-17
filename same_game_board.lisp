@@ -1,5 +1,8 @@
 ;(in-package :user)
 
+(load "../procura.lisp") 
+
+
 
 ;************************************************************************
 ;*                  BOARD - AUXILIARY OPERATIONS                        *
@@ -36,6 +39,27 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+;; Prints the board + extra line
+;;
+(defun print_boardln (board)
+    (print_board board)
+    (terpri)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Prints a list of boards
+;;
+(defun print_list_board (list)
+    (loop for board in list do
+        (print_board board)
+        (terpri)
+    )
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 ;; Set the content in the board at position (l, c) with val
 ;;
 (defun set_pos (lst l c val)
@@ -50,14 +74,28 @@
     (nth c (nth l lst))
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Create copy of board. Can't use copy-list because it will point to the 
+;; same columns
+;;
+(defun copy_board (board)
+    (let ((board2 (list 
+              (copy-list (first board))))); copies the colum and puts it inside a list
+          (loop for column in (cdr board) do
+            (nconc board2 (list (copy-list column))))
+          board2
+    )
+)
+
 ;************************************************************************
-;*                   BOARD - GRAVITY DOWN OPERATIONS                    *
+;*                  BOARD - CLUSTER OPERATIONS OPERATIONS               *
 ;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Recursively removes adjancent pieces of the same color from the board
 ;;
-(defun do_action_tail (board l c) 
+(defun remove_cluster (board l c) 
     (let(   (lines   (length board))
             (columns (length (first board)))
             (color (get_pos board l c))
@@ -66,28 +104,31 @@
         ;Propagate changes
         (if (< l (- lines 1)) ;are we before the down limit?
             (if (eq color (get_pos board (+ l 1) c )) 
-                (setq pos_changed (append pos_changed (do_action_tail board (+ l 1) c)))
+                (setq pos_changed (append pos_changed (remove_cluster board (+ l 1) c)))
             )
         )
         (if (< 0 l) ;are we after the upper limit?
             (if (eq color (get_pos board (- l 1) c))
-                (setq pos_changed (append pos_changed (do_action_tail board  (- l 1) c)))
+                (setq pos_changed (append pos_changed (remove_cluster board  (- l 1) c)))
             )
         )
         (if (< c (- columns 1)) ;are we befoe the right limit?
             (if (eq color (get_pos board l (+ c 1)))
-                (setq pos_changed (append pos_changed (do_action_tail board l (+ c 1))))
+                (setq pos_changed (append pos_changed (remove_cluster board l (+ c 1))))
             )
         )
         (if (< 0 c)
             (if (eq color (get_pos board l (- c 1)))
-                (setq pos_changed (append pos_changed (do_action_tail board  l (- c 1))))
+                (setq pos_changed (append pos_changed (remove_cluster board  l (- c 1))))
             )
         )
         pos_changed
     )
 )
 
+;************************************************************************
+;*                   BOARD - GRAVITY DOWN OPERATIONS                    *
+;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Shifts down all positions in a given column starting at pos_changed
@@ -208,28 +249,24 @@
 )
 
 ;************************************************************************
-;*           BOARD - Generate Successors Auxiliary Functions            *
+;*        BOARD - Generate Possible Actions Auxiliary Functions         *
 ;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; This function will add a pos = (l,c) to possible_actions 
-;; And will invalidate all other pos that belong to the same cluster
-;; It does this by using a copy of the board - check_actions and 
-;; putting every single pos belonging to the cluster at nil
-;
-;; If we try to add a pos on the board that is null on checked_actions,
-;; nothing happens
+;; This function will return a list of positions. Each position
+;;  corresponds to a color cluster. 
+;; The board_copy is a copy (it will be changed) of the board which actions
+;; we want to find out.
 ;;
-(defun add_action (board l c checked_actions possible_actions)
-    (setf p '(a c))
-    (if (not (null (get_pos checked_actions l c)))
+;;
+(defun add_action (l c board_copy possible_actions)
+    (if (not (null (get_pos board_copy l c)))
         (progn
           (if (null possible_actions )
             (setf possible_actions (append possible_actions (list (list l c)) ))
             (nconc possible_actions (list (list l c))))
-          (mark_check_actions checked_actions (do_action_tail board l c))
-          (set_pos board l c nil)
-        ))
+          (remove_cluster board_copy l c))
+    )
     possible_actions
 )
 
@@ -237,7 +274,7 @@
 ;;
 ;; This is the function that gets the checked_actions board and a list of
 ;; positons of a cluster and sets it all to null
-;;
+;; ! I don't think I need this. 
 (defun mark_check_actions (checked_actions cluster_positions)
     (loop for pos in cluster_positions do
       (set_pos checked_actions (first pos) (second pos) nil)))
@@ -250,96 +287,150 @@
 ;; Apply the action resulting of tapping position to the board
 ;;
 (defun do_action (board position)
-    (let (  (pos_changed (do_action_tail board (first position) (second position))))
+    (let (  (pos_changed (remove_cluster board (first position) (second position))))
         (apply_gravity_down board pos_changed)
+        (print_boardln board)
         (apply_gravity_left board)
     )
-    (fresh-line)
-    (print_board board)
+    board
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; The same as do_action but does modify the original board
+;;
+(defun do_action_clone (board position)
+    (let* ((board2 (copy_board board))
+          (pos_changed (remove_cluster board2 (first position) (second position))))
+        (apply_gravity_down board2 pos_changed)
+        (apply_gravity_left board2)
+        board2
+    )
 )
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Generates a list with actions. One actions per cluster
+;; RETURNS a list with actions ((l,c) (l,c)...). One actions per cluster
 ;; TODO: shouldn't I just go until the first (l,0)==null in columns?
 ;;
-(defun generate_successors (board) 
+(defun generate_possible_actions (board)
     (let  ((possible_actions '())
            (lines (length board))
            (columns (length (first board)))
-           (checked_actions (copy-list board))
+           (board_clone (copy_board board))
           )
           (loop for l from 0 to (- lines 1) do 
             (loop for c from 0 to (- columns 1) do
               (setf possible_actions
-                (add_action board l c checked_actions possible_actions)))
+                (add_action l c board_clone possible_actions)))
           )
           possible_actions
     )   
 )
 
+(defun generate_successors (board)
+    (let ((successors '()) )
+      (dolist (action (generate_possible_actions  board))
+        (if (null successors)
+            (setf successors (list (do_action_clone board action)))
+            (nconc successors (list (do_action_clone board action)))
+        )
+      )
+      successors
+    )
+)
 
+
+(defun isItGoal (board)
+    (loop for l in board do
+      (loop for c in l do
+        (if (not (null c))
+            (return nil))))
+    T
+)
 
 ;************************************************************************
 ;*                            MAIN                                      *
 ;************************************************************************
-;; 10x4 board with 3 colors
-(defvar b1 '((2 1 3 2 3 3 2 3 3 3) 
-             (1 3 2 2 1 3 3 2 2 2) 
-             (1 3 1 3 2 2 2 1 2 1) 
-             (1 3 3 3 1 3 1 1 1 3)))
+;; ;; 10x4 board with 3 colors
+;; (defvar b1 '((2 1 3 2 3 3 2 3 3 3) 
+;;              (1 3 2 2 1 3 3 2 2 2) 
+;;              (1 3 1 3 2 2 2 1 2 1) 
+;;              (1 3 3 3 1 3 1 1 1 3)))
 
-;; 10x4 board with 5 colors 
-(defvar b2 '((4 3 3 1 2 5 1 2 1 5) 
-             (2 4 4 4 1 5 2 4 1 2)
-             (5 2 4 1 4 5 1 2 5 4)
-             (1 3 1 4 2 5 2 5 4 5)))
+;; ;; 10x4 board with 5 colors 
+;; (defvar b2 '((4 3 3 1 2 5 1 2 1 5) 
+;;              (2 4 4 4 1 5 2 4 1 2)
+;;              (5 2 4 1 4 5 1 2 5 4)
+;;              (1 3 1 4 2 5 2 5 4 5)))
 
-;; 15x10 board with 3 colors
-(defvar b3 '((3 3 3 2 1 2 3 1 3 1)
-             (1 1 2 3 3 1 1 1 3 1)
-             (3 3 1 2 1 1 3 2 1 1)
-             (3 3 2 3 3 1 3 3 2 2)
-             (3 2 2 2 3 3 2 1 2 2)
-             (3 1 2 2 2 2 1 2 1 3)
-             (2 3 2 1 2 1 1 2 2 1)
-             (2 2 3 1 1 1 3 2 1 3)
-             (1 3 3 1 1 2 3 1 3 1) 
-             (2 1 2 2 1 3 1 1 2 3)
-             (2 1 1 3 3 3 1 2 3 1)
-             (1 2 1 1 3 2 2 1 2 2)
-             (2 1 3 2 1 2 1 3 2 3)
-             (1 2 1 3 1 2 2 3 2 3)
-             (3 3 1 2 3 1 1 2 3 1)))
+;; ;; 15x10 board with 3 colors
+;; (defvar b3 '((3 3 3 2 1 2 3 1 3 1)
+;;              (1 1 2 3 3 1 1 1 3 1)
+;;              (3 3 1 2 1 1 3 2 1 1)
+;;              (3 3 2 3 3 1 3 3 2 2)
+;;              (3 2 2 2 3 3 2 1 2 2)
+;;              (3 1 2 2 2 2 1 2 1 3)
+;;              (2 3 2 1 2 1 1 2 2 1)
+;;              (2 2 3 1 1 1 3 2 1 3)
+;;              (1 3 3 1 1 2 3 1 3 1) 
+;;              (2 1 2 2 1 3 1 1 2 3)
+;;              (2 1 1 3 3 3 1 2 3 1)
+;;              (1 2 1 1 3 2 2 1 2 2)
+;;              (2 1 3 2 1 2 1 3 2 3)
+;;              (1 2 1 3 1 2 2 3 2 3)
+;;              (3 3 1 2 3 1 1 2 3 1)))
 
-;; 15x10 board with 5 colors
-(defvar b4 '((5 1 1 1 2 1 4 2 1 2)
-             (5 5 5 4 1 2 2 1 4 5)
-             (5 5 3 5 5 3 1 5 4 3)
-             (3 3 3 2 4 3 1 3 5 1)
-             (5 3 4 2 2 2 2 1 3 1)
-             (1 1 5 3 1 1 2 5 5 5)
-             (4 2 5 1 4 5 4 1 1 1)
-             (5 3 5 3 3 3 3 4 2 2)
-             (2 3 3 2 5 4 3 4 4 4)
-             (3 5 5 2 2 5 2 2 4 2)
-             (1 4 2 3 2 4 5 5 4 2)
-             (4 1 3 2 4 3 4 4 3 1)
-             (3 1 3 4 4 1 5 1 5 4) 
-             (1 3 1 5 2 4 4 3 3 2)
-             (4 2 4 2 2 5 3 1 2 1)))
+;; ;; 15x10 board with 5 colors
+;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
+;;              (5 5 5 4 1 2 2 1 4 5)
+;;              (5 5 3 5 5 3 1 5 4 3)
+;;              (3 3 3 2 4 3 1 3 5 1)
+;;              (5 3 4 2 2 2 2 1 3 1)
+;;              (1 1 5 3 1 1 2 5 5 5)
+;;              (4 2 5 1 4 5 4 1 1 1)
+;;              (5 3 5 3 3 3 3 4 2 2)
+;;              (2 3 3 2 5 4 3 4 4 4)
+;;              (3 5 5 2 2 5 2 2 4 2)
+;;              (1 4 2 3 2 4 5 5 4 2)
+;;              (4 1 3 2 4 3 4 4 3 1)
+;;              (3 1 3 4 4 1 5 1 5 4) 
+;;              (1 3 1 5 2 4 4 3 3 2)
+;;              (4 2 4 2 2 5 3 1 2 1)))
 
-(do_action b1 '(1 0))
-(print_board b1)
-(terpri)
+;; (do_action b1 '(1 0))
+;; (print_board b1)
+;; (terpri)
 
-(do_action b2 '(0 1))
-(print_board b2)
-(terpri)
+;; (do_action b2 '(0 1))
+;; (print_board b2)
+;; (terpri)
 
-(do_action b3 '(12 9))
-(print_board b3)
-(terpri)
+;; (do_action b3 '(12 9))
+;; (print_board b3)
+;; (terpri)
 
-(do_action b4 '(14 3))
-(print_board b4)
-(terpri)
+;; (do_action b4 '(14 3))
+;; (print_board b4)
+;; (terpri)
+
+
+
+
+;! TO'S TESTING
+
+(defvar boardinho'((1 2 2 3 3) 
+                   (2 2 2 1 3) 
+                   (1 2 2 2 2) 
+                   (1 1 1 1 1)))
+                   
+(print_list_board (generate_successors boardinho))
+
+;(cria-problema boardinho '(generate_successors))
+
+;; (defun cria-problema (estado-inicial operadores 
+;; 		      &key estado-final
+;; 			   objectivo?
+;; 			   custo
+;; 			   heuristica
+;; 			   (hash #'sxhash)
+;; 			   (estado= #'eql))
