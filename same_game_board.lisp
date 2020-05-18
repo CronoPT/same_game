@@ -1,6 +1,6 @@
 ;(in-package :user)
 
-(load "../procura.lisp") 
+(load "procura.lisp") 
 
 
 
@@ -94,7 +94,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Recursively removes adjancent pieces of the same color, clusters, 
-;;  from the board
+;; from the board
 ;;  
 (defun remove_cluster (board l c) 
     (let(   (lines   (length board))
@@ -104,23 +104,23 @@
         (set_pos board l c nil)
         ;Propagate changes
         (if (< l (- lines 1)) ;are we before the down limit?
-            (if (eq color (get_pos board (+ l 1) c )) 
-                (setq pos_changed (append pos_changed (remove_cluster board (+ l 1) c)))
+            (if (eq color (get_pos board (+ l 1) c))
+                (setf pos_changed (append pos_changed (remove_cluster board (+ l 1) c)))
             )
         )
-        (if (< 0 l) ;are we after the upper limit?
+        (if (> l 0) ;are we begore the upper limit?
             (if (eq color (get_pos board (- l 1) c))
-                (setq pos_changed (append pos_changed (remove_cluster board  (- l 1) c)))
+                (setf pos_changed (append pos_changed (remove_cluster board  (- l 1) c)))
             )
         )
-        (if (< c (- columns 1)) ;are we befoe the right limit?
+        (if (< c (- columns 1)) ;are we before the right limit?
             (if (eq color (get_pos board l (+ c 1)))
-                (setq pos_changed (append pos_changed (remove_cluster board l (+ c 1))))
+                (setf pos_changed (append pos_changed (remove_cluster board l (+ c 1))))
             )
         )
-        (if (< 0 c)
+        (if (> c 0) ;are we before the left limit?
             (if (eq color (get_pos board l (- c 1)))
-                (setq pos_changed (append pos_changed (remove_cluster board  l (- c 1))))
+                (setf pos_changed (append pos_changed (remove_cluster board  l (- c 1))))
             )
         )
         pos_changed
@@ -147,18 +147,19 @@
     )
 )
 
+(defun compare (pos1 pos2)
+    (< (first pos1) (first pos2))
+)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Applies down gravity to the board, i.e. all pieces that do not have
 ;; pieces bellow will fall
 ;;
 (defun apply_gravity_down (board pos_changed)
-    (sort pos_changed (lambda (pos1 pos2) (< (first pos1) (first pos2)))) ;ordena por linhas
-    (if (not (null pos_changed))   
-        (progn
-            (bring_down_from    board (first pos_changed)) ;bring first down
-            (apply_gravity_down board (rest  pos_changed)) ;bring the rest down
-        )
+    (setf pos_changed (sort pos_changed 'compare)) ;ordena por linhas
+    (loop for position in pos_changed do
+        (bring_down_from board position)
     )
     board
 )
@@ -276,12 +277,11 @@
 ;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Apply the action resulting of tapping position to the board
+;; Apply the action resulting of tapping position on the board
 ;;
 (defun do_action (board position)
     (let (  (pos_changed (remove_cluster board (first position) (second position))))
         (apply_gravity_down board pos_changed)
-        (print_boardln board)
         (apply_gravity_left board)
     )
     board
@@ -302,7 +302,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; RETURNS a list with actions ((l,c) (l,c)...). One actions per cluster
-;; TODO: shouldn't I just go until the first (l,0)==null in columns?
+;; ? shouldn't I just go until the first (l,0)==null in columns?
 ;;
 (defun generate_possible_actions (board)
     (let  ((possible_actions '())
@@ -332,19 +332,19 @@
 )
 
 
-(defun isItGoal (board)
+(defun is_it_goal (board)
     (print board)
     (loop for l in board do
       (loop for c in l do
          (if (not (null c))
-             (return-from isItGoal nil))))    
+             (return-from is_it_goal nil))))    
     T
 )
 
 ;************************************************************************
 ;*                            MAIN                                      *
 ;************************************************************************
-;; ;; 10x4 board with 3 colors
+;; 10x4 board with 3 colors
 ;; (defvar b1 '((2 1 3 2 3 3 2 3 3 3) 
 ;;              (1 3 2 2 1 3 3 2 2 2) 
 ;;              (1 3 1 3 2 2 2 1 2 1) 
@@ -393,6 +393,30 @@
 ;; (do_action b1 '(1 0))
 ;; (print_board b1)
 ;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
+;; (do_action b1 '(3 1))
+;; (print_board b1)
+;; (terpri)
 
 ;; (do_action b2 '(0 1))
 ;; (print_board b2)
@@ -419,12 +443,13 @@
 
 
 
-(setf problema (cria-problema boardinho '(generate_successors) :objectivo? #'isItGoal))
+(defvar problema (cria-problema boardinho '(generate_successors) :objectivo? #'is_it_goal))
 
 
 (print "SPAM BEGINS")
-(setf A (procura problema 'largura))
+(defvar A (procura problema 'largura))
 (terpri)
 (print "RESULTS")
 (terpri)
 (print_list_board (first A))
+
