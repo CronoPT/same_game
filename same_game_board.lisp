@@ -255,19 +255,47 @@
 ;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+;; This function will tell if we can play in position (l, c). In this
+;; game we have to remove at least 2 pieces at a time
+;;
+(defun can_play_here (board l c)
+    (let(   (lines   (length board))
+            (columns (length (first board)))
+            (color (get_pos board l c)))
+        (if (< l (- lines 1)) ;are we before the down limit?
+            (if (eq color (get_pos board (+ l 1) c))
+                (return-from can_play_here T)))
+        (if (> l 0) ;are we begore the upper limit?
+            (if (eq color (get_pos board (- l 1) c))
+                (return-from can_play_here T)))
+        (if (< c (- columns 1)) ;are we before the right limit?
+            (if (eq color (get_pos board l (+ c 1)))
+                (return-from can_play_here T)))
+        (if (> c 0) ;are we before the left limit?
+            (if (eq color (get_pos board l (- c 1)))
+                (return-from can_play_here T)))
+        nil
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 ;; This function will return a list of positions. Each position
-;;  corresponds to a color cluster. 
+;; corresponds to a color cluster. 
 ;; The board_copy is a copy (it will be changed) of the board which actions
 ;; we want to find out.
 ;;
-;;
 (defun add_action (l c board_copy possible_actions)
     (if (not (null (get_pos board_copy l c)))
-        (progn
-          (if (null possible_actions )
-            (setf possible_actions (append possible_actions (list (list l c)) ))
-            (nconc possible_actions (list (list l c))))
-          (remove_cluster board_copy l c))
+        (if (can_play_here board_copy l c) 
+            (progn
+                (if (null possible_actions)
+                    (setf possible_actions (append possible_actions (list (list l c)) ))
+                    (nconc possible_actions (list (list l c)))
+                )
+                (remove_cluster board_copy l c)
+            )
+        )
     )
     possible_actions
 )
@@ -362,15 +390,22 @@
     )
 )
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; ? Will we have to see the best position here in terms of score
+;;
+;; (defun is_it_goal (state)
+;;     (let ((board (state-board state)))
+;;         (loop for l in board do
+;;         (loop for c in l do
+;;             (if (not (null c))
+;;                 (return-from is_it_goal nil)))))
+;;     T
+;; )
 (defun is_it_goal (state)
-    (let ((board (state-board state)))
-        (loop for l in board do
-        (loop for c in l do
-            (if (not (null c))
-                (return-from is_it_goal nil)))))
-    T
+    (> (state-score state) 150)
 )
+
 
 (defun h1 (state)
     (list-length (generate_possible_actions (state-board state)))
@@ -408,22 +443,22 @@
 ;;              (1 2 1 3 1 2 2 3 2 3)
 ;;              (3 3 1 2 3 1 1 2 3 1)))
 
-;; ;; 15x10 board with 5 colors
-;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
-;;              (5 5 5 4 1 2 2 1 4 5)
-;;              (5 5 3 5 5 3 1 5 4 3)
-;;              (3 3 3 2 4 3 1 3 5 1)
-;;              (5 3 4 2 2 2 2 1 3 1)
-;;              (1 1 5 3 1 1 2 5 5 5)
-;;              (4 2 5 1 4 5 4 1 1 1)
-;;              (5 3 5 3 3 3 3 4 2 2)
-;;              (2 3 3 2 5 4 3 4 4 4)
-;;              (3 5 5 2 2 5 2 2 4 2)
-;;              (1 4 2 3 2 4 5 5 4 2)
-;;              (4 1 3 2 4 3 4 4 3 1)
-;;              (3 1 3 4 4 1 5 1 5 4) 
-;;              (1 3 1 5 2 4 4 3 3 2)
-;;              (4 2 4 2 2 5 3 1 2 1)))
+;; 15x10 board with 5 colors
+(defvar boardinho '((5 1 1 1 2 1 4 2 1 2)
+             (5 5 5 4 1 2 2 1 4 5)
+             (5 5 3 5 5 3 1 5 4 3)
+             (3 3 3 2 4 3 1 3 5 1)
+             (5 3 4 2 2 2 2 1 3 1)
+             (1 1 5 3 1 1 2 5 5 5)
+             (4 2 5 1 4 5 4 1 1 1)
+             (5 3 5 3 3 3 3 4 2 2)
+             (2 3 3 2 5 4 3 4 4 4)
+             (3 5 5 2 2 5 2 2 4 2)
+             (1 4 2 3 2 4 5 5 4 2)
+             (4 1 3 2 4 3 4 4 3 1)
+             (3 1 3 4 4 1 5 1 5 4) 
+             (1 3 1 5 2 4 4 3 3 2)
+             (4 2 4 2 2 5 3 1 2 1)))
 
 ;; (do_action b1 '(1 0))
 ;; (print_board b1)
@@ -470,10 +505,10 @@
 
 ;! SOLVING PROBLEM WITH BFS EXAMPLE
 
-(defvar boardinho'((1 2 2 3 3) 
-                   (2 2 2 1 3) 
-                   (1 2 2 2 2) 
-                   (1 1 1 1 1)))
+;; (defvar boardinho'((1 2 2 3 3) 
+;;                    (2 2 2 1 3) 
+;;                    (1 2 2 2 2) 
+;;                    (1 1 1 1 1)))
                    
 (defvar initial_state (make-state :board boardinho :score 0))
 
