@@ -2,7 +2,47 @@
 
 (load "procura.lisp") 
 
+;************************************************************************
+;*                       TIME AND MEMORY HELPERS                        *
+;************************************************************************
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Limit execution time of our program in seconds
+;;
+(defvar *time_limit_seconds* 300)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Limit heap usage of our program in megabytes
+;; ? The limit is actually 256 MB sould we leave this 2MB padding
+;;
+(defvar *memory_limit_megabytes* 160)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Get the ammount of seconds elapsed since program started
+;;
+(defun get_elapsed_seconds ()
+    (/ (get-internal-run-time) internal-time-units-per-second)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Get used heap memory in megabytes - what i do is get the output
+;; of room into a string and read the first number that appears there
+;; which i think it's the number we want
+;;
+(defun get_megabytes_used()
+    (let ((room_str (with-output-to-string (*standard-output*) (room nil)))
+          (mb_bytes 0))
+        (loop for char across room_str until (eql char #\newline) do
+            (if (digit-char-p char)
+                (setf mb_bytes (+ (* 10 mb_bytes) (digit-char-p char)))
+            )
+        )
+        (floor mb_bytes 1000000)
+    )
+)
 
 ;************************************************************************
 ;*                  BOARD - AUXILIARY OPERATIONS                        *
@@ -378,6 +418,9 @@
 )
 
 (defun generate_successors (state)
+    (if (>= (get_megabytes_used) *memory_limit_megabytes*)
+        (return-from generate_successors '())
+    )
     (let ((successors '()) 
           (board (state-board state)))
       (dolist (action (generate_possible_actions  board))
@@ -393,20 +436,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; ? Will we have to see the best position here in terms of score
+;; ? Or probably will end up returning always false
 ;;
-;; (defun is_it_goal (state)
-;;     (let ((board (state-board state)))
-;;         (loop for l in board do
-;;         (loop for c in l do
-;;             (if (not (null c))
-;;                 (return-from is_it_goal nil)))))
-;;     T
-;; )
 (defun is_it_goal (state)
-    (> (state-score state) 150)
+    (let ((board (state-board state)))
+        (loop for l in board do
+        (loop for c in l do
+            (if (not (null c))
+                (return-from is_it_goal nil)))))
+    T
 )
 
+;; (defun is_it_goal (state)
+;;     (> (state-score state) 150)
+;; )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; The intuition behind this one is that the fewer plays we have 
+;; available the more points we will have for each one
+;;
 (defun h1 (state)
     (list-length (generate_possible_actions (state-board state)))
 )
@@ -427,38 +476,38 @@
 ;;              (1 3 1 4 2 5 2 5 4 5)))
 
 ;; 15x10 board with 3 colors
-;; (defvar b3 '((3 3 3 2 1 2 3 1 3 1)
-;;              (1 1 2 3 3 1 1 1 3 1)
-;;              (3 3 1 2 1 1 3 2 1 1)
-;;              (3 3 2 3 3 1 3 3 2 2)
-;;              (3 2 2 2 3 3 2 1 2 2)
-;;              (3 1 2 2 2 2 1 2 1 3)
-;;              (2 3 2 1 2 1 1 2 2 1)
-;;              (2 2 3 1 1 1 3 2 1 3)
-;;              (1 3 3 1 1 2 3 1 3 1) 
-;;              (2 1 2 2 1 3 1 1 2 3)
-;;              (2 1 1 3 3 3 1 2 3 1)
-;;              (1 2 1 1 3 2 2 1 2 2)
-;;              (2 1 3 2 1 2 1 3 2 3)
-;;              (1 2 1 3 1 2 2 3 2 3)
-;;              (3 3 1 2 3 1 1 2 3 1)))
+(defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
+             (1 1 2 3 3 1 1 1 3 1)
+             (3 3 1 2 1 1 3 2 1 1)
+             (3 3 2 3 3 1 3 3 2 2)
+             (3 2 2 2 3 3 2 1 2 2)
+             (3 1 2 2 2 2 1 2 1 3)
+             (2 3 2 1 2 1 1 2 2 1)
+             (2 2 3 1 1 1 3 2 1 3)
+             (1 3 3 1 1 2 3 1 3 1) 
+             (2 1 2 2 1 3 1 1 2 3)
+             (2 1 1 3 3 3 1 2 3 1)
+             (1 2 1 1 3 2 2 1 2 2)
+             (2 1 3 2 1 2 1 3 2 3)
+             (1 2 1 3 1 2 2 3 2 3)
+             (3 3 1 2 3 1 1 2 3 1)))
 
 ;; 15x10 board with 5 colors
-(defvar boardinho '((5 1 1 1 2 1 4 2 1 2)
-             (5 5 5 4 1 2 2 1 4 5)
-             (5 5 3 5 5 3 1 5 4 3)
-             (3 3 3 2 4 3 1 3 5 1)
-             (5 3 4 2 2 2 2 1 3 1)
-             (1 1 5 3 1 1 2 5 5 5)
-             (4 2 5 1 4 5 4 1 1 1)
-             (5 3 5 3 3 3 3 4 2 2)
-             (2 3 3 2 5 4 3 4 4 4)
-             (3 5 5 2 2 5 2 2 4 2)
-             (1 4 2 3 2 4 5 5 4 2)
-             (4 1 3 2 4 3 4 4 3 1)
-             (3 1 3 4 4 1 5 1 5 4) 
-             (1 3 1 5 2 4 4 3 3 2)
-             (4 2 4 2 2 5 3 1 2 1)))
+;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
+;;              (5 5 5 4 1 2 2 1 4 5)
+;;              (5 5 3 5 5 3 1 5 4 3)
+;;              (3 3 3 2 4 3 1 3 5 1)
+;;              (5 3 4 2 2 2 2 1 3 1)
+;;              (1 1 5 3 1 1 2 5 5 5)
+;;              (4 2 5 1 4 5 4 1 1 1)
+;;              (5 3 5 3 3 3 3 4 2 2)
+;;              (2 3 3 2 5 4 3 4 4 4)
+;;              (3 5 5 2 2 5 2 2 4 2)
+;;              (1 4 2 3 2 4 5 5 4 2)
+;;              (4 1 3 2 4 3 4 4 3 1)
+;;              (3 1 3 4 4 1 5 1 5 4) 
+;;              (1 3 1 5 2 4 4 3 3 2)
+;;              (4 2 4 2 2 5 3 1 2 1)))
 
 ;; (do_action b1 '(1 0))
 ;; (print_board b1)
@@ -515,11 +564,17 @@
 (defvar problema (cria-problema initial_state '(generate_successors) :objectivo? #'is_it_goal :heuristica #'h1))
 
 (print "SPAM BEGINS")
-(defvar A (procura problema 'a*))
+(time (defvar A (procura problema 'a*)))
 (terpri)
 (print "RESULTS")
 (terpri)
 (loop for state in (first A) do
-    (print_state state)
-)
+    (print_state state))
+(terpri)
+(format t "Expanded  nodes: ~d" (third  A))
+(terpri)
+(format t "Generated nodes: ~d" (fourth A))
+(terpri)
+(format t "Elapsed seconds ~f" (get_elapsed_seconds))
+
 
