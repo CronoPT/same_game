@@ -277,26 +277,56 @@
 ;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Apply the action resulting of tapping position on the board
+;; A state in our problem corresponds to a board and the score of all 
+;; the playes doen up until now
+;;
+(defstruct state
+    board
+    score
+)
+
+(defun print_state (state)
+    (let ((board (state-board state))
+          (score (state-score state)))
+        (format t "Score:~d" score)
+        (fresh-line)
+        (print_boardln board)
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Score a move that removed n pieces from the board
+;;
+(defun score_move (n)
+    (* (- n 2) (- n 2))
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Apply the action resulting of tapping position on the board and 
+;; return the score corresponding to that move
 ;;
 (defun do_action (board position)
     (let (  (pos_changed (remove_cluster board (first position) (second position))))
         (apply_gravity_down board pos_changed)
         (apply_gravity_left board)
+        (score_move (list-length pos_changed))
     )
-    board
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; The same as do_action but does modify the original board
+;; Applies an action to the board in state and generates a new state
+;; based on the move, computing the new board and the new score
 ;;
-(defun do_action_clone (board position)
-    (let* ((board2 (copy_board board))
-          (pos_changed (remove_cluster board2 (first position) (second position))))
-        (apply_gravity_down board2 pos_changed)
-        (apply_gravity_left board2)
-        board2
+(defun do_action_clone (state position)
+    (let* ((board (state-board state))
+           (score (state-score state))
+           (new_board (copy_board board))
+           (new_score (+ (do_action new_board position) score)))
+        
+        (make-state :board new_board :score new_score)
     )
 )
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -319,12 +349,13 @@
     )   
 )
 
-(defun generate_successors (board)
-    (let ((successors '()) )
+(defun generate_successors (state)
+    (let ((successors '()) 
+          (board (state-board state)))
       (dolist (action (generate_possible_actions  board))
         (if (null successors)
-            (setf successors (list (do_action_clone board action)))
-            (nconc successors (list (do_action_clone board action)))
+            (setf  successors (list (do_action_clone state action)))
+            (nconc successors (list (do_action_clone state action)))
         )
       )
       successors
@@ -332,13 +363,17 @@
 )
 
 
-(defun is_it_goal (board)
-    (print board)
-    (loop for l in board do
-      (loop for c in l do
-         (if (not (null c))
-             (return-from is_it_goal nil))))    
+(defun is_it_goal (state)
+    (let ((board (state-board state)))
+        (loop for l in board do
+        (loop for c in l do
+            (if (not (null c))
+                (return-from is_it_goal nil)))))
     T
+)
+
+(defun h1 (state)
+    (list-length (generate_possible_actions (state-board state)))
 )
 
 ;************************************************************************
@@ -356,7 +391,7 @@
 ;;              (5 2 4 1 4 5 1 2 5 4)
 ;;              (1 3 1 4 2 5 2 5 4 5)))
 
-;; ;; 15x10 board with 3 colors
+;; 15x10 board with 3 colors
 ;; (defvar b3 '((3 3 3 2 1 2 3 1 3 1)
 ;;              (1 1 2 3 3 1 1 1 3 1)
 ;;              (3 3 1 2 1 1 3 2 1 1)
@@ -440,16 +475,16 @@
                    (1 2 2 2 2) 
                    (1 1 1 1 1)))
                    
+(defvar initial_state (make-state :board boardinho :score 0))
 
-
-
-(defvar problema (cria-problema boardinho '(generate_successors) :objectivo? #'is_it_goal))
-
+(defvar problema (cria-problema initial_state '(generate_successors) :objectivo? #'is_it_goal :heuristica #'h1))
 
 (print "SPAM BEGINS")
-(defvar A (procura problema 'largura))
+(defvar A (procura problema 'a*))
 (terpri)
 (print "RESULTS")
 (terpri)
-(print_list_board (first A))
+(loop for state in (first A) do
+    (print_state state)
+)
 
