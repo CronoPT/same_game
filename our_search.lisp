@@ -684,28 +684,29 @@ Estrategia A*."
     (procura-com-espaco problema espaco)))
   
 
-    
+;; ! DO CHANGES here for the memory and time limit
 (defun procura-com-espaco (problema espaco)
   
-  (let ((objectivo? (problema-objectivo? problema)))
+  (let ((objectivo? (problema-objectivo? problema))
+        (best_node ))
     (loop
       
-      ;; Quando nao temos mais nos e porque ja exploramos todo o
-      ;; espaco e nao encontramos a solucao (nao existe)
-      (when (espaco-vazio? espaco)
-	(return nil))
+        ;; Quando nao temos mais nos e porque ja exploramos todo o
+        ;; espaco e nao encontramos a solucao (nao existe)
+        (when (espaco-vazio? espaco)
+	        (return nil))
       
-      ;; Vamos considerar o no gerado mais antigo para termos uma
-      ;; procura em largura primeiro
-      (let ((proximo-no (espaco-proximo-no espaco)))
+        ;; Vamos considerar o no gerado mais antigo para termos uma
+        ;; procura em largura primeiro
+        (let ((proximo-no (espaco-proximo-no espaco)))
 
-	;; Se atingimos a solucao paramos e devolvemos os estados no
-	;; caminho 
-	(when (funcall objectivo? (no-estado proximo-no))
-	  (return (da-caminho proximo-no)))
-	
-	;; Caso contrario, devemos expandir o no
-	(espaco-expande-no espaco proximo-no)))))
+            ;; Se atingimos a solucao paramos e devolvemos os estados no
+            ;; caminho 
+	        (when (funcall objectivo? (no-estado proximo-no))
+	            (return (da-caminho proximo-no)))
+	        ;; Caso contrario, devemos expandir o no
+	        (espaco-expande-no espaco proximo-no))))
+)
   
 
 (defun da-caminho (no)
