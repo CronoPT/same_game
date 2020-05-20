@@ -17,7 +17,7 @@
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 220)
+(defvar *memory_limit_megabytes* 200)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -444,14 +444,18 @@
 ;; ? Will we have to see the best position here in terms of score
 ;; ? Or probably will end up returning always false
 ;;
-(defun is_it_goal (state)
-    (let ((board (state-board state)))
-        (loop for l in board do
-        (loop for c in l do
-            (if (not (null c))
-                (return-from is_it_goal nil)))))
-    T
+(defun is_it_goal ()
+    (> (get_elapsed_seconds) *time_limit_seconds*)
 )
+
+;; (defun is_it_goal (state)
+;;     (let ((board (state-board state)))
+;;         (loop for l in board do
+;;         (loop for c in l do
+;;             (if (not (null c))
+;;                 (return-from is_it_goal nil)))))
+;;     T
+;; )
 
 ;; (defun is_it_goal (state)
 ;;     (> (state-score state) 150)

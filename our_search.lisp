@@ -453,10 +453,11 @@
 
 
 
-;;; 
-;;; Funcoes a utilizar para a procura em largura-primeiro.
-;;;
-
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! OG COMMENT - Funcoes a utilizar para a procura em largura-primeiro.
+;;! Now we wnat to maximise the score
+;;!
 (defun junta-ordenados (abertos nos-a*)
   "Junta os nos por ordem decrescente do seu valor de f.  
 Estrategia A*."
@@ -468,7 +469,6 @@ Estrategia A*."
 	   (> n1 n2)))
     (merge 'list (sort nos-a* #'maior :key #'no-a*-f) abertos
 	   #'maior :key #'no-a*-f)))
-;; ! HERE CHANGE STUFF HERE
 
 
 (defun cria-no-procura-a* (espaco estado no-pai)
@@ -684,17 +684,20 @@ Estrategia A*."
     (procura-com-espaco problema espaco)))
   
 
-;; ! DO CHANGES here for the memory and time limit
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;!
+;;! Now we keep track of the best node so we can return it ata any time
+;;!
 (defun procura-com-espaco (problema espaco)
   
   (let ((objectivo? (problema-objectivo? problema))
-        (best_node ))
+        (best_node nil)) ;! kepp track of the best node
     (loop
       
         ;; Quando nao temos mais nos e porque ja exploramos todo o
         ;; espaco e nao encontramos a solucao (nao existe)
         (when (espaco-vazio? espaco)
-	        (return nil))
+	        (return (da-caminho best_node))) ; ! when running out of states, return the best
       
         ;; Vamos considerar o no gerado mais antigo para termos uma
         ;; procura em largura primeiro
@@ -702,10 +705,14 @@ Estrategia A*."
 
             ;; Se atingimos a solucao paramos e devolvemos os estados no
             ;; caminho 
-	        (when (funcall objectivo? (no-estado proximo-no))
-	            (return (da-caminho proximo-no)))
-	        ;; Caso contrario, devemos expandir o no
-	        (espaco-expande-no espaco proximo-no))))
+	        (when (funcall objectivo?)
+	            (return (da-caminho best_node))) ; ! return from best node
+            (when (null best_node)
+                (setf best_node proximo-no))
+	        (when (> (no-a*-f proximo-no) (no-a*-f best_node))
+                (setf best_node proximo-no))     ; ! the expanded node is the best till know
+            ;; Caso contrario, devemos expandir o no
+            (espaco-expande-no espaco proximo-no))))
 )
   
 
