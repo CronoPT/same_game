@@ -1,6 +1,7 @@
 ;(in-package :user)
 
-(load "procura.lisp") 
+;; (load "procura.lisp")
+(load "our_search.lisp")
 
 ;************************************************************************
 ;*                       TIME AND MEMORY HELPERS                        *
@@ -16,7 +17,7 @@
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 160)
+(defvar *memory_limit_megabytes* 220)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -417,6 +418,11 @@
     )   
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Computes the possible actions and applies them, generating new states,
+;; this is the only operator we have in the whole problem
+;;
 (defun generate_successors (state)
     (if (>= (get_megabytes_used) *memory_limit_megabytes*)
         (return-from generate_successors '())
@@ -453,11 +459,61 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; The intuition behind this one is that the fewer plays we have 
-;; available the more points we will have for each one
+;; Tells how many pieces there are in the board still. It will be 
+;; useful to compute heuristics
+;;
+(defun get_remaining_pieces (board)
+    (let((lines   (list-length board))
+         (columns (list-length (first board)))
+         (total   0))
+        (loop for l from 0 to (- lines 1) do
+            (loop for c from 0 to (- columns 1) until (not (null (get_pos board l c))) do
+                (1+ total)))
+        (- (* lines columns) total)
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Tells how many clusters there are in the board still. It will be 
+;; useful to compute heuristics
+;;
+(defun get_remaining_clusters (board)
+    (list-length (generate_possible_actions board))
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; In this heristic the estimation of points we can still do by playing
+;; in this state is the score you would get to play a cluster that has
+;; the mean size of all the clusters in the board at the moment multi-
+;; plied by the number of clusters remaining
 ;;
 (defun h1 (state)
-    (list-length (generate_possible_actions (state-board state)))
+    (let* ((board (state-board state))
+           (remaining_pieces   (get_remaining_pieces board))
+           (remaining_clusters (get_remaining_clusters board)))
+        (if (eq 0 remaining_clusters)
+            0 ; no more plays, no more points
+            (* remaining_clusters (score_move (/ remaining_pieces remaining_clusters)))
+        )
+    )
+)
+
+;; ! TALK WITH TIAGO - the other heuristic (just returning remaining clusters)
+;; ! was solving the puzzle way faster with our present goal of cleaning the 
+;; ! board, but that's not our goal, right? We still have to put that into
+;; ! search the code. OH, OH! I just notcied, it was slower, but it did
+;; ! go from a solution with 592 to one with 1038 - AWESOME!!!
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; We're not interested in minimizing the lenght of the solution, we're
+;; interested in maximing the score, we will maximize cost and make the
+;; cost a score
+;;
+(defun cost_same_game (state)
+    (state-score state)
 )
 
 ;************************************************************************
@@ -561,7 +617,10 @@
                    
 (defvar initial_state (make-state :board boardinho :score 0))
 
-(defvar problema (cria-problema initial_state '(generate_successors) :objectivo? #'is_it_goal :heuristica #'h1))
+(defvar problema (cria-problema initial_state '(generate_successors) 
+                    :objectivo? #'is_it_goal
+                    :custo #'cost_same_game
+                    :heuristica #'h1))
 
 (print "SPAM BEGINS")
 (time (defvar A (procura problema 'a*)))
