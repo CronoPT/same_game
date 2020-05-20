@@ -1,7 +1,7 @@
 ;(in-package :user)
 
 ;; (load "procura.lisp")
-(load "our_search.lisp")
+(load "procura.lisp")
 
 ;************************************************************************
 ;*                       TIME AND MEMORY HELPERS                        *
@@ -10,7 +10,7 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 300)
+(defvar *time_limit_seconds* 100)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -33,7 +33,7 @@
 ;; of room into a string and read the first number that appears there
 ;; which i think it's the number we want
 ;;
-(defun get_megabytes_used()
+(defun get_megabytes_used ()
     (let ((room_str (with-output-to-string (*standard-output*) (room nil)))
           (mb_bytes 0))
         (loop for char across room_str until (eql char #\newline) do
@@ -444,18 +444,18 @@
 ;; ? Will we have to see the best position here in terms of score
 ;; ? Or probably will end up returning always false
 ;;
-(defun is_it_goal ()
-    (> (get_elapsed_seconds) *time_limit_seconds*)
-)
-
-;; (defun is_it_goal (state)
-;;     (let ((board (state-board state)))
-;;         (loop for l in board do
-;;         (loop for c in l do
-;;             (if (not (null c))
-;;                 (return-from is_it_goal nil)))))
-;;     T
+;; (defun is_it_goal ()
+;;     (>= (get_elapsed_seconds) *time_limit_seconds*)
 ;; )
+
+(defun is_it_goal (state)
+    (let ((board (state-board state)))
+        (loop for l in board do
+        (loop for c in l do
+            (if (not (null c))
+                (return-from is_it_goal nil)))))
+    T
+)
 
 ;; (defun is_it_goal (state)
 ;;     (> (state-score state) 150)
@@ -504,11 +504,9 @@
     )
 )
 
-;; ! TALK WITH TIAGO - the other heuristic (just returning remaining clusters)
-;; ! was solving the puzzle way faster with our present goal of cleaning the 
-;; ! board, but that's not our goal, right? We still have to put that into
-;; ! search the code. OH, OH! I just notcied, it was slower, but it did
-;; ! go from a solution with 592 to one with 1038 - AWESOME!!!
+(defun h2 (state) 
+    0
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -519,6 +517,57 @@
 (defun cost_same_game (state)
     (state-score state)
 )
+
+
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! OG COMMENT - Funcoes a utilizar para a procura em largura-primeiro.
+;;! Now we wnat to maximise the score
+;;!
+(defun junta-ordenados (abertos nos-a*)
+  "Junta os nos por ordem crescente do seu valor de f.  
+   Estrategia A*."
+  
+  (flet ((maior (n1 n2)
+	        (> n1 n2)))
+        (merge 'list (sort nos-a* #'maior :key #'no-a*-f) abertos
+	        #'maior :key #'no-a*-f)))
+
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;!
+;;! Now we keep track of the best node so we can return it ata any time
+;;? Maybe replacing best_node in expansion or generation is all the same,
+;;? because if the node is trully the best then it will be the next one
+;;? to be expanded
+;;!
+(defun procura-com-espaco (problema espaco)
+  
+  (let ((objectivo? (problema-objectivo? problema))
+        (best_node nil)) ;! kepp track of the best node
+    (loop
+      
+        ;; Quando nao temos mais nos e porque ja exploramos todo o
+        ;; espaco e nao encontramos a solucao (nao existe)
+        (when (espaco-vazio? espaco)
+	        (return (da-caminho best_node))) ; ! when running out of states, return the best
+      
+        ;; Vamos considerar o no gerado mais antigo para termos uma
+        ;; procura em largura primeiro
+        (let ((proximo-no (espaco-proximo-no espaco)))
+
+            ;; Se atingimos a solucao paramos e devolvemos os estados no
+            ;; caminho 
+	        (when (funcall objectivo?)
+	            (return (da-caminho best_node))) ; ! return from best node
+            (when (null best_node)
+                (setf best_node proximo-no))
+	        (when (>= (state-score (no-estado proximo-no)) (state-score (no-estado best_node)))
+                (setf best_node proximo-no))     ; ! the expanded node is the best till know
+            ;; Caso contrario, devemos expandir o no
+            (espaco-expande-no espaco proximo-no))))
+)
+
+
 
 ;************************************************************************
 ;*                            MAIN                                      *
@@ -536,21 +585,21 @@
 ;;              (1 3 1 4 2 5 2 5 4 5)))
 
 ;; 15x10 board with 3 colors
-(defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
-             (1 1 2 3 3 1 1 1 3 1)
-             (3 3 1 2 1 1 3 2 1 1)
-             (3 3 2 3 3 1 3 3 2 2)
-             (3 2 2 2 3 3 2 1 2 2)
-             (3 1 2 2 2 2 1 2 1 3)
-             (2 3 2 1 2 1 1 2 2 1)
-             (2 2 3 1 1 1 3 2 1 3)
-             (1 3 3 1 1 2 3 1 3 1) 
-             (2 1 2 2 1 3 1 1 2 3)
-             (2 1 1 3 3 3 1 2 3 1)
-             (1 2 1 1 3 2 2 1 2 2)
-             (2 1 3 2 1 2 1 3 2 3)
-             (1 2 1 3 1 2 2 3 2 3)
-             (3 3 1 2 3 1 1 2 3 1)))
+;; (defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
+;;              (1 1 2 3 3 1 1 1 3 1)
+;;              (3 3 1 2 1 1 3 2 1 1)
+;;              (3 3 2 3 3 1 3 3 2 2)
+;;              (3 2 2 2 3 3 2 1 2 2)
+;;              (3 1 2 2 2 2 1 2 1 3)
+;;              (2 3 2 1 2 1 1 2 2 1)
+;;              (2 2 3 1 1 1 3 2 1 3)
+;;              (1 3 3 1 1 2 3 1 3 1) 
+;;              (2 1 2 2 1 3 1 1 2 3)
+;;              (2 1 1 3 3 3 1 2 3 1)
+;;              (1 2 1 1 3 2 2 1 2 2)
+;;              (2 1 3 2 1 2 1 3 2 3)
+;;              (1 2 1 3 1 2 2 3 2 3)
+;;              (3 3 1 2 3 1 1 2 3 1)))
 
 ;; 15x10 board with 5 colors
 ;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
@@ -614,10 +663,10 @@
 
 ;! SOLVING PROBLEM WITH BFS EXAMPLE
 
-;; (defvar boardinho'((1 2 2 3 3) 
-;;                    (2 2 2 1 3) 
-;;                    (1 2 2 2 2) 
-;;                    (1 1 1 1 1)))
+(defvar boardinho'((1 2 2 3 3) 
+                   (2 2 2 1 3) 
+                   (1 2 2 2 2) 
+                   (1 1 1 1 1)))
                    
 (defvar initial_state (make-state :board boardinho :score 0))
 
@@ -627,7 +676,7 @@
                     :heuristica #'h1))
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'a*)))
+(time (defvar A (procura problema 'profundidade)))
 (terpri)
 (print "RESULTS")
 (terpri)

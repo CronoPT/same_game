@@ -671,7 +671,9 @@ Estrategia A*."
 					 (problema-heuristica problema))))
     (procura-com-espaco problema espaco)))
 
+(defun iterative_sampling (problema)
 
+)
 
 (defun largura-primeiro (problema &key espaco-em-arvore?)
   "Funcao que implementa o algoritmo de procura em largura primeiro."
@@ -687,6 +689,9 @@ Estrategia A*."
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;!
 ;;! Now we keep track of the best node so we can return it ata any time
+;;? Maybe replacing best_node in expansion or generation is all the same,
+;;? because if the node is trully the best then it will be the next one
+;;? to be expanded
 ;;!
 (defun procura-com-espaco (problema espaco)
   
@@ -709,7 +714,7 @@ Estrategia A*."
 	            (return (da-caminho best_node))) ; ! return from best node
             (when (null best_node)
                 (setf best_node proximo-no))
-	        (when (> (no-a*-f proximo-no) (no-a*-f best_node))
+	        (when (>= (estado-score (no-estado proximo-no)) (estado-score (no-estado best_node)))
                 (setf best_node proximo-no))     ; ! the expanded node is the best till know
             ;; Caso contrario, devemos expandir o no
             (espaco-expande-no espaco proximo-no))))
@@ -735,52 +740,52 @@ Estrategia A*."
 
 
 (defun ida* (problema &key espaco-em-arvore?)
-  (let ((estado= (problema-estado= problema))
-	(heur (problema-heuristica problema))
-	(fun-custo (problema-custo problema))
-	(objectivo? (problema-objectivo? problema)))
-    
-    (labels ((esta-no-caminho? (estado caminho)
-	       (unless espaco-em-arvore?
-		 (member estado caminho :test estado=)))
-	     
-	     (prof (estado custo-max custo-caminho caminho)
-	       (block prof
-		 (if (esta-no-caminho? estado caminho)
-		   nil
-		   (let ((custo (+ custo-caminho (funcall heur estado))))
-		     (cond ((> custo custo-max) custo)
-			   ((funcall objectivo? estado) (list estado))
-			   (t
-			    (let ((min-custo most-positive-fixnum))
-			      (dolist (suc (problema-gera-sucessores
-					    problema estado))
-				(let ((solucao (prof suc 
-						     custo-max 
-						     (+ custo-caminho
-							(funcall fun-custo suc))
-						     (or espaco-em-arvore?
-							 (cons estado
-							       caminho)))))
-				  (if (numberp solucao)
-				    (setf min-custo (min min-custo
-							 solucao))
-				    (if solucao
-				      (return-from prof (cons estado
-							      solucao))))))
-			      min-custo))))))))
-      
-      (let ((custo-max 0))
-	(loop
-	  (let ((solucao (prof (problema-estado-inicial problema)
-			       custo-max
-			       0
-			       nil)))
-	    (if (numberp solucao)
-	      (if (> solucao custo-max)
-		(setf custo-max solucao)
-		(return nil))
-	      (return solucao))))))))
+	(let(	(estado= (problema-estado= problema))
+			(heur (problema-heuristica problema))
+			(fun-custo (problema-custo problema))
+			(objectivo? (problema-objectivo? problema)))
+
+		(labels ((esta-no-caminho? (estado caminho)
+					(unless espaco-em-arvore?
+					(member estado caminho :test estado=)))
+				
+				(prof (estado custo-max custo-caminho caminho)
+					(block prof
+					(if (esta-no-caminho? estado caminho)
+					nil
+					(let ((custo (+ custo-caminho (funcall heur estado))))
+						(cond ((> custo custo-max) custo)
+						((funcall objectivo? estado) (list estado))
+						(t
+						(let ((min-custo most-positive-fixnum))
+							(dolist (suc (problema-gera-sucessores
+								problema estado))
+						(let ((solucao (prof suc 
+										custo-max 
+										(+ custo-caminho
+									(funcall fun-custo suc))
+										(or espaco-em-arvore?
+										(cons estado
+											caminho)))))
+							(if (numberp solucao)
+							(setf min-custo (min min-custo
+										solucao))
+							(if solucao
+								(return-from prof (cons estado
+											solucao))))))
+							min-custo))))))))
+			
+			(let ((custo-max 0))
+				(loop
+					(let ((solucao (prof (problema-estado-inicial problema)
+								custo-max
+								0
+								nil)))
+					(if (numberp solucao)
+						(if (> solucao custo-max)
+					(setf custo-max solucao)
+					(return nil))
+						(return solucao))))))))
 				      
 			      
 			  
@@ -795,38 +800,45 @@ Estrategia A*."
   "Algoritmo de procura em profundidade primeiro."
 
   (let ((estado= (problema-estado= problema))
-	(objectivo? (problema-objectivo? problema)))
+		(objectivo? (problema-objectivo? problema))
+		(best_node nil))
 
-    (labels ((esta-no-caminho? (estado caminho)
-	       (member estado caminho :test estado=))
+    (labels(	(esta-no-caminho? (estado caminho)
+	       			(member estado caminho :test estado=))
 	     
-	     (procura-prof (estado caminho prof-actual)
-	       (block procura-prof
+				(procura-prof (estado caminho prof-actual)
+					(block procura-prof
 		 
-		 ;; base da recursao:
-		 ;; 1. quando comecamos a repetir estados pelos quais ja
-		 ;;    passamos no caminho que esta a ser percorrido
-		 ;;    (para evitar caminhos infinitos)
-		 ;; 2. quando atingimos o objectivo
-		 ;; 3. quando ultrapassamos a profundidade limite ate
-		 ;;    onde se deve efectuar a procura
-		 (cond ((funcall objectivo? estado) (list estado))
-		       ((= prof-actual profundidade-maxima) nil)
-		       ((esta-no-caminho? estado caminho) nil)
-		       (t 
-			(dolist (suc (problema-gera-sucessores problema
-							       estado))
-			  ;; avancamos recursivamente, em profundidade,
-			  ;; para cada sucessor
-			  (let ((solucao (procura-prof suc 
-						       (cons estado caminho)
-						       (1+ prof-actual))))
-			    (when solucao
-			      (return-from procura-prof (cons estado
-							      solucao))))))))))
+					;; base da recursao:
+					;; 1. quando comecamos a repetir estados pelos quais ja
+					;;    passamos no caminho que esta a ser percorrido
+					;;    (para evitar caminhos infinitos)
+					;; 2. quando atingimos o objectivo
+					;; 3. quando ultrapassamos a profundidade limite ate
+					;;    onde se deve efectuar a procura
+					(cond 	((funcall objectivo?) (return-from profundidade-primeiro (da-caminho best_node))))
+							((= prof-actual profundidade-maxima) nil)
+							((esta-no-caminho? estado caminho) nil)
+							(t ; last condition of cond
+								(when (>= (state-score (no-estado proximo-no)) (state-score (no-estado best_node)))
+                					(setf best_node proximo-no))  
+								(dolist (suc (problema-gera-sucessores problema
+													estado))
+										;; avancamos recursivamente, em profundidade,
+										;; para cada sucessor
+										(let ((solucao (procura-prof suc 
+														(cons estado caminho)
+														(1+ prof-actual))))
+											(when solucao
+											(return-from procura-prof (cons estado
+															solucao))))))))))
       
-      (procura-prof (problema-estado-inicial problema) nil 0))))
+      (procura-prof (problema-estado-inicial problema) nil 0)))) ;! Where everything happens
 
+
+(defun our_dfs ()
+
+)
 
 ;;;
 ;;;              Procura em profundidade iterativa  
