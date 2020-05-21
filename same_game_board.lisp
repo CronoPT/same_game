@@ -605,12 +605,21 @@
             (espaco-expande-no espaco proximo-no))))
 )
 
+(defstruct (node_depth (:include no))
+    depth
+)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; From a list of states and their parent node, generates a list of nodes
 ;;
 (defun generate_nodes (successores father)
-    (mapcar (lambda (succ) (cria-no succ father)) successores)
+    (mapcar (lambda (succ) 
+                (make-node_depth 
+                    :estado succ 
+                    :pai father
+                    :depth (+ 1 (node_depth-depth father)))
+            ) successores)
 )
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -624,18 +633,20 @@
 
     (let*(  (stack (stack_create))
             (closed '())
-            (initial_node (cria-no (problema-estado-inicial problema) nil))
+            (initial_node (make-node_depth :estado (problema-estado-inicial problema) 
+                                           :pai nil
+                                           :depth 0))
             (best_node initial_node)
             (next_node nil)
             (objetivo? (problema-objectivo? problema)))
         (stack_push stack initial_node)
         (loop
             (when (stack_empty stack)
-                (return (da-caminho best_node)))
+                (return-from depth_first_search (da-caminho best_node)))
             (setf next_node (stack_pop stack))
-            (unless (member next_node closed)
+            (unless (or (member next_node closed) (>= (node_depth-depth next_node) profundidade-maxima))
                 (when (funcall objetivo?)
-                    (return (da-caminho best_node)))
+                    (return-from depth_first_search (da-caminho best_node)))
                 (when (>= (state-score (no-estado next_node)) (state-score (no-estado best_node)))
                     (setf best_node next_node))
 
@@ -646,6 +657,7 @@
                 )
             )
         )
+        nil
     )
 )
 
@@ -709,21 +721,21 @@
 ;;              (1 3 1 4 2 5 2 5 4 5)))
 
 ;; 15x10 board with 3 colors
-(defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
-             (1 1 2 3 3 1 1 1 3 1)
-             (3 3 1 2 1 1 3 2 1 1)
-             (3 3 2 3 3 1 3 3 2 2)
-             (3 2 2 2 3 3 2 1 2 2)
-             (3 1 2 2 2 2 1 2 1 3)
-             (2 3 2 1 2 1 1 2 2 1)
-             (2 2 3 1 1 1 3 2 1 3)
-             (1 3 3 1 1 2 3 1 3 1) 
-             (2 1 2 2 1 3 1 1 2 3)
-             (2 1 1 3 3 3 1 2 3 1)
-             (1 2 1 1 3 2 2 1 2 2)
-             (2 1 3 2 1 2 1 3 2 3)
-             (1 2 1 3 1 2 2 3 2 3)
-             (3 3 1 2 3 1 1 2 3 1)))
+;; (defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
+;;              (1 1 2 3 3 1 1 1 3 1)
+;;              (3 3 1 2 1 1 3 2 1 1)
+;;              (3 3 2 3 3 1 3 3 2 2)
+;;              (3 2 2 2 3 3 2 1 2 2)
+;;              (3 1 2 2 2 2 1 2 1 3)
+;;              (2 3 2 1 2 1 1 2 2 1)
+;;              (2 2 3 1 1 1 3 2 1 3)
+;;              (1 3 3 1 1 2 3 1 3 1) 
+;;              (2 1 2 2 1 3 1 1 2 3)
+;;              (2 1 1 3 3 3 1 2 3 1)
+;;              (1 2 1 1 3 2 2 1 2 2)
+;;              (2 1 3 2 1 2 1 3 2 3)
+;;              (1 2 1 3 1 2 2 3 2 3)
+;;              (3 3 1 2 3 1 1 2 3 1)))
 
 ;; 15x10 board with 5 colors
 ;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
@@ -787,10 +799,10 @@
 
 ;! SOLVING PROBLEM WITH BFS EXAMPLE
 
-;; (defvar boardinho'((1 2 2 3 3) 
-;;                    (2 2 2 1 3) 
-;;                    (1 2 2 2 2) 
-;;                    (1 1 1 1 1)))
+(defvar boardinho'((1 2 2 3 3) 
+                   (2 2 2 1 3) 
+                   (1 2 2 2 2) 
+                   (1 1 1 1 1)))
                    
 (defvar initial_state (make-state :board boardinho :score 0))
 
