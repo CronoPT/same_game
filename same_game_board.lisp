@@ -605,6 +605,10 @@
             (espaco-expande-no espaco proximo-no))))
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A different node that allows us to keep track of the depth of nodes
+;;
 (defstruct (node_depth (:include no))
     depth
 )
@@ -658,6 +662,13 @@
     )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; If the new solutions returned by DFS is not as good as the one before
+;; two things can happen: 1) the time is up and the solution is partial
+;; or 2) the DFS swept the search space twice and already returned the 
+;; the best position possible, in both cases, we want to finish the IDS
+;;
 (defun new_best_than_old (new old)
     (> (state-score (car (last new))) (state-score (car (last old))))
 )
@@ -687,6 +698,52 @@
     )
 )
 
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! Sends a random probe down the state tree
+;;!
+(defun send_probe (problema)
+    (let*(  (next_node (cria-no (problema-estado-inicial problema) nil))
+            (successores nil)
+            (to_expand 0)
+            (objectivo? (problema-objectivo? problema)))
+        (loop
+            (setf successores (problema-gera-sucessores problema (no-estado next_node)))
+            (when (or (null successores) (funcall objectivo?))
+                (return-from send_probe (da-caminho next_node)))
+            (setf to_expand (random (list-length successores)))
+            (setf next_node (cria-no (nth to_expand successores) next_node))
+        )
+    )
+)
+
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! The iterative sampling algorithm - it will never return before the 
+;;! time limit, as long as there are time, it will constantly be
+;;! sending probes down the tree in hopes of finding a better solution
+;;!
+(defun iterative_sampling_search (problema)
+    (let(   (best_solution nil)
+            (current_solution nil)
+            (objectivo? (problema-objectivo? problema)))
+        (loop
+            (when (funcall objectivo?)
+                (return-from iterative_sampling_search best_solution))
+            (setf current_solution (send_probe problema))
+            (if (null best_solution)
+                (setf best_solution current_solution)
+                (when (new_best_than_old current_solution best_solution)
+                    (setf best_solution current_solution))
+            )
+        )
+    )
+)
+
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! The same function as in procura.lisp but with our reimplementations
+;;!
 (defun procura (problema tipo-procura
 		&key (profundidade-maxima most-positive-fixnum)
 		     (espaco-em-arvore? nil))
@@ -715,7 +772,9 @@
             ((string-equal tipo-procura "a*")
                 (a* problema :espaco-em-arvore? espaco-em-arvore?))
             ((string-equal tipo-procura "ida*")
-                (ida* problema :espaco-em-arvore? espaco-em-arvore?)))))
+                (ida* problema :espaco-em-arvore? espaco-em-arvore?))
+            ((string-equal tipo-procura "iterative_sampling")
+                (iterative_sampling_search problema)))))
 
     (let(   (*nos-gerados* 0)
 	        (*nos-expandidos* 0)
@@ -838,7 +897,7 @@
                     :heuristica #'h1))
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'profundidade-iterativa)))
+(time (defvar A (procura problema 'iterative_sampling)))
 (terpri)
 (print "RESULTS")
 (terpri)
