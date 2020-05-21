@@ -439,6 +439,13 @@
   "Junta os nos no fim da lista.  Estrategia em largura-primeiro."
   (queue-nconc abertos nos))
 
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! Hopefully this will help us to do a DFS in the way we want 
+;;!
+(defun junta-no-inicio (abertos nos)
+  "Junta os nos no fim da lista.  Estrategia em largura-primeiro."
+  (queue-nconc nos abertos))
 
 (defun cria-no-procura-largura (espaco estado no-pai)
   "Cria um novo no para o caso da largura-primeiro, mas apenas se isso
@@ -541,6 +548,22 @@ Estrategia A*."
 			     :vazio-fn #'empty-queue-p)
 	       #'cria-no-procura-largura
 	       espaco-em-arvore?))
+
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! Hopefully this will help us to do a DFS in the way we want 
+;;!
+(defun novo-espaco-profundidade (problema &key espaco-em-arvore?)
+	(novo-espaco problema
+		(cria-abertos (make-queue)
+				:hash-fn (problema-hash problema)
+				:proximo-fn #'front
+				:insere-fn #'junta-no-inicio
+				:remove-fn #'delete-from-queue
+				:vazio-fn #'empty-queue-p)
+		#'cria-no-procura-largura
+		espaco-em-arvore?))	
+)
 
 (defun novo-espaco-a* (problema &key espaco-em-arvore?)
   (novo-espaco problema 
@@ -794,8 +817,6 @@ Estrategia A*."
 ;;;
 ;;;              Procura em profundidade primeiro  
 ;;;
-
-
 (defun profundidade-primeiro (problema profundidade-maxima) 
   "Algoritmo de procura em profundidade primeiro."
 
@@ -836,8 +857,22 @@ Estrategia A*."
       (procura-prof (problema-estado-inicial problema) nil 0)))) ;! Where everything happens
 
 
-(defun our_dfs ()
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! Our implementation of DFS. Might not be as quick as the original,
+;;! but at least it allows us to keep the search within the time 
+;;! and memory limit
+;;!
+(defun depth_first_search (problema profundidade-maxima)
+  "Funcao que implementa o algoritmo de procura em largura primeiro."
 
+	(let ((espaco (novo-espaco-profundidade problema
+						:espaco-em-arvore? espaco-em-arvore?)))
+		(junta-nos-gerados espaco
+					(list (cria-no (problema-estado-inicial problema)
+							nil)))
+		(procura-com-espaco problema espaco)
+	)
 )
 
 ;;;

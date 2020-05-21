@@ -17,7 +17,7 @@
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 200)
+(defvar *memory_limit_megabytes* 120)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -43,6 +43,35 @@
         )
         (floor mb_bytes 1000000)
     )
+)
+
+;************************************************************************
+;*                      STACK STRUCT - USED IN DFS                      *
+;************************************************************************
+(defstruct stack
+    elements    
+)
+
+(defun stack_create ()
+    (make-stack :elements '())
+)
+
+(defun stack_push (stack element)
+    (if (listp element)
+        (setf (stack-elements stack) (append element (stack-elements stack)))
+        (setf (stack-elements stack) (append (list element) (stack-elements stack)))
+    )
+)
+
+(defun stack_pop (stack)
+    (let(   (poped (first (stack-elements stack))))
+        (setf (stack-elements stack) (rest (stack-elements stack)))
+        poped
+    )
+)
+
+(defun stack_empty (stack)
+    (= 0 (list-length (stack-elements stack)))
 )
 
 ;************************************************************************
@@ -354,6 +383,10 @@
     score
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Prints to the screen the board and score of a given state
+;;
 (defun print_state (state)
     (let ((board (state-board state))
           (score (state-score state)))
@@ -444,18 +477,18 @@
 ;; ? Will we have to see the best position here in terms of score
 ;; ? Or probably will end up returning always false
 ;;
-;; (defun is_it_goal ()
-;;     (>= (get_elapsed_seconds) *time_limit_seconds*)
-;; )
-
-(defun is_it_goal (state)
-    (let ((board (state-board state)))
-        (loop for l in board do
-        (loop for c in l do
-            (if (not (null c))
-                (return-from is_it_goal nil)))))
-    T
+(defun is_it_goal ()
+    (>= (get_elapsed_seconds) *time_limit_seconds*)
 )
+
+;; (defun is_it_goal (state)
+;;     (let ((board (state-board state)))
+;;         (loop for l in board do
+;;         (loop for c in l do
+;;             (if (not (null c))
+;;                 (return-from is_it_goal nil)))))
+;;     T
+;; )
 
 ;; (defun is_it_goal (state)
 ;;     (> (state-score state) 150)
@@ -504,6 +537,11 @@
     )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Just so we can use Uniform Cost Search ' might be good to prove the
+;; value of the heuristics we wrote
+;;
 (defun h2 (state) 
     0
 )
@@ -522,7 +560,7 @@
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
 ;;! OG COMMENT - Funcoes a utilizar para a procura em largura-primeiro.
-;;! Now we wnat to maximise the score
+;;! Now we want to maximise the score
 ;;!
 (defun junta-ordenados (abertos nos-a*)
   "Junta os nos por ordem crescente do seu valor de f.  
@@ -567,7 +605,93 @@
             (espaco-expande-no espaco proximo-no))))
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; From a list of states and their parent node, generates a list of nodes
+;;
+(defun generate_nodes (successores father)
+    (mapcar (lambda (succ) (cria-no succ father)) successores)
+)
 
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! Our implementation of DFS. Might not be as quick as the original,
+;;! but at least it allows us to keep the search within the time 
+;;! and memory limit, it is an iterative search, not recursive
+;;!
+(defun depth_first_search (problema profundidade-maxima)
+  "Funcao que implementa o algoritmo de procura em largura primeiro."
+
+    (let*(  (stack (stack_create))
+            (closed '())
+            (initial_node (cria-no (problema-estado-inicial problema) nil))
+            (best_node initial_node)
+            (next_node nil)
+            (objetivo? (problema-objectivo? problema)))
+        (stack_push stack initial_node)
+        (loop
+            (when (stack_empty stack)
+                (return (da-caminho best_node)))
+            (setf next_node (stack_pop stack))
+            (unless (member next_node closed)
+                (when (funcall objetivo?)
+                    (return (da-caminho best_node)))
+                (when (>= (state-score (no-estado next_node)) (state-score (no-estado best_node)))
+                    (setf best_node next_node))
+
+                (stack_push stack (generate_nodes (problema-gera-sucessores problema (no-estado next_node)) next_node))
+                (if (null closed)
+                    (setf closed (list next_node))
+                    (push next_node (cdr (last closed))) ; add expanded node to closed
+                )
+            )
+        )
+    )
+)
+
+(defun procura (problema tipo-procura
+		&key (profundidade-maxima most-positive-fixnum)
+		     (espaco-em-arvore? nil))
+  "Dado um problema e um tipo de procura devolve uma lista com: a
+  solucao para o problema (a lista de estados desde o estado inicial
+  ate' ao estado final), ou nil caso nao encontre a solucao; tempo
+  gasto na procura (em internal-time-units); numero de nos expandidos;
+  numero de nos gerados."
+
+  (flet ((faz-a-procura (problema tipo-procura 
+			 profundidade-maxima espaco-em-arvore?)
+	   ;; Usamos cond em vez de case porque nao sabemos de que
+	   ;; package veem os simbolos (o string-equal funciona com o
+	   ;; symbol-name do simbolo e e' "case-insensitive")
+	   
+	   ;; Actualmente, apenas a procura em largura, o A* e o IDA*
+	   ;; estao a aproveitar a informacao do espaco de estados ser
+	   ;; uma arvore
+	   (cond ((string-equal tipo-procura "largura")
+                (largura-primeiro problema 
+                            :espaco-em-arvore? espaco-em-arvore?))
+            ((string-equal tipo-procura "profundidade")
+                (depth_first_search problema profundidade-maxima))
+            ((string-equal tipo-procura "profundidade-iterativa")
+                (profundidade-iterativa problema profundidade-maxima))
+            ((string-equal tipo-procura "a*")
+                (a* problema :espaco-em-arvore? espaco-em-arvore?))
+            ((string-equal tipo-procura "ida*")
+                (ida* problema :espaco-em-arvore? espaco-em-arvore?)))))
+
+    (let(   (*nos-gerados* 0)
+	        (*nos-expandidos* 0)
+	        (tempo-inicio (get-internal-run-time)))
+        (let(   (solucao (faz-a-procura problema tipo-procura
+				    profundidade-maxima
+				    espaco-em-arvore?))
+            )
+	(list solucao 
+	      (- (get-internal-run-time) tempo-inicio)
+	      *nos-expandidos*
+	      *nos-gerados*)))
+    )
+)
 
 ;************************************************************************
 ;*                            MAIN                                      *
@@ -585,21 +709,21 @@
 ;;              (1 3 1 4 2 5 2 5 4 5)))
 
 ;; 15x10 board with 3 colors
-;; (defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
-;;              (1 1 2 3 3 1 1 1 3 1)
-;;              (3 3 1 2 1 1 3 2 1 1)
-;;              (3 3 2 3 3 1 3 3 2 2)
-;;              (3 2 2 2 3 3 2 1 2 2)
-;;              (3 1 2 2 2 2 1 2 1 3)
-;;              (2 3 2 1 2 1 1 2 2 1)
-;;              (2 2 3 1 1 1 3 2 1 3)
-;;              (1 3 3 1 1 2 3 1 3 1) 
-;;              (2 1 2 2 1 3 1 1 2 3)
-;;              (2 1 1 3 3 3 1 2 3 1)
-;;              (1 2 1 1 3 2 2 1 2 2)
-;;              (2 1 3 2 1 2 1 3 2 3)
-;;              (1 2 1 3 1 2 2 3 2 3)
-;;              (3 3 1 2 3 1 1 2 3 1)))
+(defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
+             (1 1 2 3 3 1 1 1 3 1)
+             (3 3 1 2 1 1 3 2 1 1)
+             (3 3 2 3 3 1 3 3 2 2)
+             (3 2 2 2 3 3 2 1 2 2)
+             (3 1 2 2 2 2 1 2 1 3)
+             (2 3 2 1 2 1 1 2 2 1)
+             (2 2 3 1 1 1 3 2 1 3)
+             (1 3 3 1 1 2 3 1 3 1) 
+             (2 1 2 2 1 3 1 1 2 3)
+             (2 1 1 3 3 3 1 2 3 1)
+             (1 2 1 1 3 2 2 1 2 2)
+             (2 1 3 2 1 2 1 3 2 3)
+             (1 2 1 3 1 2 2 3 2 3)
+             (3 3 1 2 3 1 1 2 3 1)))
 
 ;; 15x10 board with 5 colors
 ;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
@@ -663,10 +787,10 @@
 
 ;! SOLVING PROBLEM WITH BFS EXAMPLE
 
-(defvar boardinho'((1 2 2 3 3) 
-                   (2 2 2 1 3) 
-                   (1 2 2 2 2) 
-                   (1 1 1 1 1)))
+;; (defvar boardinho'((1 2 2 3 3) 
+;;                    (2 2 2 1 3) 
+;;                    (1 2 2 2 2) 
+;;                    (1 1 1 1 1)))
                    
 (defvar initial_state (make-state :board boardinho :score 0))
 
