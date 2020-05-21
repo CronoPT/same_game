@@ -629,8 +629,6 @@
 ;;! and memory limit, it is an iterative search, not recursive
 ;;!
 (defun depth_first_search (problema profundidade-maxima)
-  "Funcao que implementa o algoritmo de procura em largura primeiro."
-
     (let*(  (stack (stack_create))
             (closed '())
             (initial_node (make-node_depth :estado (problema-estado-inicial problema) 
@@ -644,7 +642,7 @@
             (when (stack_empty stack)
                 (return-from depth_first_search (da-caminho best_node)))
             (setf next_node (stack_pop stack))
-            (unless (or (member next_node closed) (>= (node_depth-depth next_node) profundidade-maxima))
+            (unless (or (member next_node closed) (> (node_depth-depth next_node) profundidade-maxima))
                 (when (funcall objetivo?)
                     (return-from depth_first_search (da-caminho best_node)))
                 (when (>= (state-score (no-estado next_node)) (state-score (no-estado best_node)))
@@ -657,7 +655,35 @@
                 )
             )
         )
-        nil
+    )
+)
+
+(defun new_best_than_old (new old)
+    (> (state-score (car (last new))) (state-score (car (last old))))
+)
+
+;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;! 
+;;! Ideally we would use 
+;;!
+(defun iterative_deepening_search (problema profundidade-maxima)
+    (let(   (iteration 0)
+            (best_solution nil)
+            (current_solution nil)
+            (objectivo? (problema-objectivo? problema)))
+        (loop
+            (when (or (funcall objectivo?) (> iteration profundidade-maxima))
+                (return-from iterative_deepening_search best_solution))
+            (setf current_solution (depth_first_search problema iteration))
+            (if (null best_solution)
+                (setf best_solution current_solution)
+                (if (new_best_than_old current_solution best_solution)
+                    (setf best_solution current_solution)
+                    (return-from iterative_deepening_search best_solution)
+                )
+            )
+            (incf iteration 1)
+        )
     )
 )
 
@@ -685,7 +711,7 @@
             ((string-equal tipo-procura "profundidade")
                 (depth_first_search problema profundidade-maxima))
             ((string-equal tipo-procura "profundidade-iterativa")
-                (profundidade-iterativa problema profundidade-maxima))
+                (iterative_deepening_search problema profundidade-maxima))
             ((string-equal tipo-procura "a*")
                 (a* problema :espaco-em-arvore? espaco-em-arvore?))
             ((string-equal tipo-procura "ida*")
@@ -812,7 +838,7 @@
                     :heuristica #'h1))
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'profundidade)))
+(time (defvar A (procura problema 'profundidade-iterativa)))
 (terpri)
 (print "RESULTS")
 (terpri)
