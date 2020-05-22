@@ -383,6 +383,18 @@
     score
 )
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; We're not interested in minimizing the lenght of the solution, we're
+;; interested in maximing the score, we will maximize cost and make the
+;; cost a score
+;;
+(defun cost_same_game (state)
+    (state-score state)
+)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Prints to the screen the board and score of a given state
@@ -494,6 +506,12 @@
 ;;     (> (state-score state) 150)
 ;; )
 
+
+
+;************************************************************************
+;*                             HEURISTICS                               *
+;************************************************************************
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Tells how many pieces there are in the board still. It will be 
@@ -546,16 +564,111 @@
     0
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; We're not interested in minimizing the lenght of the solution, we're
-;; interested in maximing the score, we will maximize cost and make the
-;; cost a score
+;; This heuristic is very similiar to h4, but instead of estimating -1 
+;; point, it estimates less 1%. It seems do do better than the other.
+;; Interesting for report?
 ;;
-(defun cost_same_game (state)
-    (state-score state)
+(defun h3 (state)
+    (let* ((board (state-board state))
+          (successors (generate_possible_actions board))
+          (dummy_board (copy_board board))
+          (expected_score 0))
+         (dolist (action successors)
+            (setf expected_score 
+                  (+  expected_score
+                      (score_move   
+                        (* 0.99
+                          (length
+                            (remove_cluster dummy_board (first action) (second action)))))))
+         )
+         expected_score
+    )
 )
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Expects we're going to get the current points if we got all clusters
+;; 
+(defun h4 (state)
+    (let* ((board (state-board state))
+          (successors (generate_possible_actions board))
+          (dummy_board (copy_board board))
+          (expected_score 0))
+         (dolist (action successors)
+            (setf expected_score 
+                  (+  expected_score
+                      (score_move   
+                          (length
+                            (remove_cluster dummy_board (first action) (second action))))))
+         )
+         (- expected_score 1) ;important. This is an incentive to actually explore the state and not only generate it
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  
+;; Expects the score to be the value of the score of the 
+;; biggest cluster
+;;
+(defun h5 (state)
+    (let* ((board (state-board state))
+          (successors (generate_possible_actions board))
+          (dummy_board (copy_board board))
+          (expected_score 0)
+          (temp_store_score 0))
+         (dolist (action successors)
+            (setf temp_store_score 
+                  (score_move  
+                          (length
+                            (remove_cluster dummy_board (first action) (second action)))))
+            (if (< expected_score temp_store_score)
+                (setf expected_score temp_store_score))   
+                            
+         )
+         expected_score ;important. This is an incentive to actually explore the state and not only generate it
+    )
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Randomized Heuristic - it increases the size of each cluster uniformly
+;;  from 0 to 100%. The idea is to prioritize the growth of clusters
+;;  but avoiding getting stuck at a potential state with a large cluster,
+;;  (this is the one which maximized the score of b3 at 2800 - but the score varies)
+;;
+;;!for VASCO: test this and ask TO why this works. 
+(defun h6 (state)
+    (let* ((board (state-board state))
+          (successors (generate_possible_actions board))
+          (dummy_board (copy_board board))
+          (expected_score 0)
+          (temp_store_score 0))
+         (dolist (action successors)
+            (setf temp_store_score 
+                  (score_move 
+                        (* (+ 1 (random 1)) 
+                          (length
+                            (remove_cluster dummy_board (first action) (second action))))))
+            (if (< expected_score temp_store_score)
+                (setf expected_score temp_store_score))   
+                            
+         )
+         expected_score  ;important. This is an incentive to actually explore the state and not only generate it
+    )
+)
+
+
+
+
+
+ 
+;************************************************************************
+;*                         SEARCH ALGORITHMS                            *
+;************************************************************************
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
@@ -569,7 +682,8 @@
   (flet ((maior (n1 n2)
 	        (> n1 n2)))
         (merge 'list (sort nos-a* #'maior :key #'no-a*-f) abertos
-	        #'maior :key #'no-a*-f)))
+	        #'maior :key #'no-a*-f))
+)
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;!
@@ -720,7 +834,7 @@
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
 ;;! The iterative sampling algorithm - it will never return before the 
-;;! time limit, as long as there are time, it will constantly be
+;;! time limit, as long as there is time, it will constantly be
 ;;! sending probes down the tree in hopes of finding a better solution
 ;;!
 (defun iterative_sampling_search (problema)
@@ -794,10 +908,10 @@
 ;*                            MAIN                                      *
 ;************************************************************************
 ;; 10x4 board with 3 colors
-;; (defvar b1 '((2 1 3 2 3 3 2 3 3 3) 
-;;              (1 3 2 2 1 3 3 2 2 2) 
-;;              (1 3 1 3 2 2 2 1 2 1) 
-;;              (1 3 3 3 1 3 1 1 1 3)))
+ (defvar b1 '((2 1 3 2 3 3 2 3 3 3) 
+              (1 3 2 2 1 3 3 2 2 2) 
+              (1 3 1 3 2 2 2 1 2 1) 
+              (1 3 3 3 1 3 1 1 1 3)))
 
 ;; ;; 10x4 board with 5 colors 
 ;; (defvar b2 '((4 3 3 1 2 5 1 2 1 5) 
@@ -806,21 +920,21 @@
 ;;              (1 3 1 4 2 5 2 5 4 5)))
 
 ;; 15x10 board with 3 colors
-;; (defvar boardinho '((3 3 3 2 1 2 3 1 3 1)
-;;              (1 1 2 3 3 1 1 1 3 1)
-;;              (3 3 1 2 1 1 3 2 1 1)
-;;              (3 3 2 3 3 1 3 3 2 2)
-;;              (3 2 2 2 3 3 2 1 2 2)
-;;              (3 1 2 2 2 2 1 2 1 3)
-;;              (2 3 2 1 2 1 1 2 2 1)
-;;              (2 2 3 1 1 1 3 2 1 3)
-;;              (1 3 3 1 1 2 3 1 3 1) 
-;;              (2 1 2 2 1 3 1 1 2 3)
-;;              (2 1 1 3 3 3 1 2 3 1)
-;;              (1 2 1 1 3 2 2 1 2 2)
-;;              (2 1 3 2 1 2 1 3 2 3)
-;;              (1 2 1 3 1 2 2 3 2 3)
-;;              (3 3 1 2 3 1 1 2 3 1)))
+ (defvar b3'((3 3 3 2 1 2 3 1 3 1)
+              (1 1 2 3 3 1 1 1 3 1)
+              (3 3 1 2 1 1 3 2 1 1)
+              (3 3 2 3 3 1 3 3 2 2)
+              (3 2 2 2 3 3 2 1 2 2)
+              (3 1 2 2 2 2 1 2 1 3)
+              (2 3 2 1 2 1 1 2 2 1)
+              (2 2 3 1 1 1 3 2 1 3)
+              (1 3 3 1 1 2 3 1 3 1) 
+              (2 1 2 2 1 3 1 1 2 3)
+              (2 1 1 3 3 3 1 2 3 1)
+              (1 2 1 1 3 2 2 1 2 2)
+              (2 1 3 2 1 2 1 3 2 3)
+              (1 2 1 3 1 2 2 3 2 3)
+              (3 3 1 2 3 1 1 2 3 1)))
 
 ;; 15x10 board with 5 colors
 ;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
@@ -881,6 +995,21 @@
 
 
 
+(defvar bt '((nil nil nil 1 1 1 1 nil nil nil)
+            (nil nil nil 1 1 1 1 1   nil nil)
+            (nil nil nil 2 1 1 1 1   nil nil)
+            (1   1   1   1 1 2 1 1    1    3)
+            (1   1   1   2 1 1 1 1    1    1)
+            (1   1   1   3 1 1 1 1    1    3)
+            (1   1   3   2 3 1 1 1    3    1)))
+
+(defvar tt (make-state :board bt :score 0))
+(print (h4  tt))
+
+
+
+
+
 
 ;! SOLVING PROBLEM WITH BFS EXAMPLE
 
@@ -889,15 +1018,15 @@
                    (1 2 2 2 2) 
                    (1 1 1 1 1)))
                    
-(defvar initial_state (make-state :board boardinho :score 0))
+(defvar initial_state (make-state :board b3 :score 0))
 
 (defvar problema (cria-problema initial_state '(generate_successors) 
                     :objectivo? #'is_it_goal
                     :custo #'cost_same_game
-                    :heuristica #'h1))
+                    :heuristica #'h6))
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'iterative_sampling)))
+(time (defvar A (procura problema 'a*)))
 (terpri)
 (print "RESULTS")
 (terpri)
@@ -909,5 +1038,7 @@
 (format t "Generated nodes: ~d" (fourth A))
 (terpri)
 (format t "Elapsed seconds ~f" (get_elapsed_seconds))
+
+
 
 
