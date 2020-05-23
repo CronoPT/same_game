@@ -741,10 +741,11 @@
 )
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;! 
+;;?  MAYBE DO RECURSIVE W/ A depth_first_search(problam profundida-maxima melhor nó)
+;;?  EM VEZ DA STACK
 ;;! Our implementation of DFS. Might not be as quick as the original,
 ;;! but at least it allows us to keep the search within the time 
-;;! and memory limit, it is an iterative search, not recursive
+;;! and memory limit, it is an iterative search, not recursive.
 ;;!
 (defun depth_first_search (problema profundidade-maxima)
     (let*(  (stack (stack_create))
@@ -885,10 +886,12 @@
                 (iterative_deepening_search problema profundidade-maxima))
             ((string-equal tipo-procura "a*")
                 (a* problema :espaco-em-arvore? espaco-em-arvore?))
-            ((string-equal tipo-procura "ida*")
+            ((string-equal tipo-procura "ida*") ;;TODO: ida*
                 (ida* problema :espaco-em-arvore? espaco-em-arvore?))
             ((string-equal tipo-procura "iterative_sampling")
                 (iterative_sampling_search problema)))))
+            ;;TODO: Abordagem Alternativa
+        
 
     (let(   (*nos-gerados* 0)
 	        (*nos-expandidos* 0)
