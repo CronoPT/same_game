@@ -855,6 +855,132 @@
     )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A different node that allows us to keep track of discrepancies of the
+;; path of a given nodde
+;;
+(defstruct (node_discrepancy (:include no))
+    discrepancies
+    heuristic
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; From a list of states and their parent node, generates a list of nodes
+;;
+(defun generate_nodes_discrepancy_max (successores father heuristic)
+    (mapcar (lambda (succ) 
+                (make-node_discrepancy
+                    :estado succ 
+                    :pai father
+                    :discrepancies (node_discrepancy-discrepancies father)
+                    :heuristic (funcall heuristic succ))
+            ) successores)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Expanding a node on a path where the limit for discrepancies has
+;; already been reached - it will return only the best node according to
+;; the heuristic
+;; ? 2 passes is better than sorting and returning the first, right? 
+;;
+(defun successores_max_discrepancy (to_expand problema)
+    (let*(  (heuristic (problema-heuristica problema))
+            (max_heuristic_val 0)
+            (successores (generate_nodes_discrepancy_max (problema-gera-sucessores problema (no-estado to_expand)) to_expand heuristic)))
+        (when (null successores)
+            (return-from successores_max_discrepancy nil))
+        (loop for node in successores do
+            (when (> (node_discrepancy-heuristic node) max_heuristic_val)
+                (setf max_heuristic_val (node_discrepancy-heuristic node)))
+        )
+        (loop for node in successores do
+            (when (eq (node_discrepancy-heuristic node) max_heuristic_val)
+                (return node))
+        )
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; From a list of states and their parent node, generates a list of nodes
+;; All discrepancies are incremented by one but then the best node is 
+;; decremented in the function successores_non_max_discrepancy
+;;
+(defun generate_nodes_discrepancy_non_max (successores father heuristic)
+    (mapcar (lambda (succ) 
+                (make-node_discrepancy
+                    :estado succ 
+                    :pai father
+                    :discrepancies (+ 1 (node_discrepancy-discrepancies father))
+                    :heuristic (funcall heuristic succ))
+            ) successores)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Comparing nodes by its heuristic value
+;;
+(defun compare_nodes (node1 node2)
+    (> (node_discrepancy-heuristic node1) (node_discrepancy-heuristic node2))
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Expanding a node on a path where the limit for discrepancies has not
+;; yet been reached - it will return all the successors but every one
+;; except for the best, will have the field 'discrepancies' incremented
+;;
+(defun successores_non_max_discrepancy (to_expand problema)
+    (let*(  (heuristic (problema-heuristica problema))
+            (successores (generate_nodes_discrepancy_non_max (problema-gera-sucessores problema (no-estado to_expand)) to_expand heuristic)))
+        (when (null successores)
+            (return-from successores_non_max_discrepancy nil))
+        (setf successores (sort successores 'compare_nodes))
+        (decf (node_discrepancy-discrepancies (nth 0 successores)) 1)
+        successores
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A wierd version of Limited Discrepancy Search proposed by Harvey that
+;; supports an arbitrary branching factor.
+;;
+(defun limited_discrepancy_search (problema)
+    (let*(  (stack (stack_create))
+            (initial_node (make-node_discrepancy :estado (problema-estado-inicial problema) 
+                                                 :pai nil
+                                                 :discrepancies 0))
+            (best_node initial_node)
+            (next_node nil)
+            (objectivo? (problema-objectivo? problema))
+            (allowed_discrepancies 0))
+        (stack_push stack initial_node)
+        (loop
+            (setf stack (stack_create))
+            (stack_push stack initial_node)
+            (loop
+                (when (stack_empty stack)
+                    (return))
+                (when (funcall objectivo?)
+	                (return-from limited_discrepancy_search (da-caminho best_node)))
+                (setf next_node (stack_pop stack))
+                (when (>= (state-score (no-estado next_node)) (state-score (no-estado best_node)))
+                    (setf best_node next_node))
+                (if (>= (node_discrepancy-discrepancies next_node) allowed_discrepancies)
+                    (stack_push stack (successores_max_discrepancy next_node problema))
+                    (stack_push stack (successores_non_max_discrepancy next_node problema))
+                )
+            )
+            (incf allowed_discrepancies 1)
+        )
+    )
+)
+
+
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
 ;;! The same function as in procura.lisp but with our reimplementations
@@ -889,7 +1015,9 @@
             ((string-equal tipo-procura "ida*") ;;TODO: ida*
                 (ida* problema :espaco-em-arvore? espaco-em-arvore?))
             ((string-equal tipo-procura "iterative_sampling")
-                (iterative_sampling_search problema)))))
+                (iterative_sampling_search problema))
+            ((string-equal tipo-procura "limited_discrepancy")
+                (limited_discrepancy_search problema)))))
             ;;TODO: Abordagem Alternativa
         
 
@@ -998,16 +1126,16 @@
 
 
 
-(defvar bt '((nil nil nil 1 1 1 1 nil nil nil)
-            (nil nil nil 1 1 1 1 1   nil nil)
-            (nil nil nil 2 1 1 1 1   nil nil)
-            (1   1   1   1 1 2 1 1    1    3)
-            (1   1   1   2 1 1 1 1    1    1)
-            (1   1   1   3 1 1 1 1    1    3)
-            (1   1   3   2 3 1 1 1    3    1)))
+;; (defvar bt '((nil nil nil 1 1 1 1 nil nil nil)
+;;             (nil nil nil 1 1 1 1 1   nil nil)
+;;             (nil nil nil 2 1 1 1 1   nil nil)
+;;             (1   1   1   1 1 2 1 1    1    3)
+;;             (1   1   1   2 1 1 1 1    1    1)
+;;             (1   1   1   3 1 1 1 1    1    3)
+;;             (1   1   3   2 3 1 1 1    3    1)))
 
-(defvar tt (make-state :board bt :score 0))
-(print (h4  tt))
+;; (defvar tt (make-state :board bt :score 0))
+;; (print (h4  tt))
 
 
 
@@ -1029,7 +1157,7 @@
                     :heuristica #'h6))
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'a*)))
+(time (defvar A (procura problema 'limited_discrepancy)))
 (terpri)
 (print "RESULTS")
 (terpri)
