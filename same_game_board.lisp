@@ -10,14 +10,14 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 20)
+(defvar *time_limit_seconds* 200)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 120)
+(defvar *memory_limit_megabytes* 200)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -521,9 +521,10 @@
     (let((lines   (list-length board))
          (columns (list-length (first board)))
          (total   0))
-        (loop for l from 0 to (- lines 1) do
-            (loop for c from 0 to (- columns 1) until (not (null (get_pos board l c))) do
-                (1+ total)))
+        (loop for column in board do
+            (loop for pos in column do
+                (when (null pos)
+                    (incf total 1))))
         (- (* lines columns) total)
     )
 )
@@ -561,6 +562,7 @@
 ;; value of the heuristics we wrote
 ;;
 (defun h2 (state) 
+    (ignore state)
     0
 )
 
@@ -633,22 +635,6 @@
 )
 
 
-(defun h6 (state)
-    (let* ((board (state-board state))
-          (successors (generate_possible_actions board))
-          (dummy_board (copy_board board))
-          (expected_score 0))
-         (dolist (action successors)
-            (setf expected_score 
-                  (+  expected_score
-                      (score_move   
-                        (* 2
-                          (length
-                            (remove_cluster dummy_board (first action) (second action)))))))
-         )
-         expected_score
-    )
-)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -679,9 +665,7 @@
 )
 
 
-
-
-
+(defun h7 (state) (score_move(get_remaining_pieces (state-board state))))
  
 ;************************************************************************
 ;*                         SEARCH ALGORITHMS                            *
@@ -864,38 +848,55 @@
 
         (labels 
             (
-              (prof (node score-min)
+              (prof (node score-min depth)
+                ;;  (format t "(~A) H(~A)" depth (funcall heur (no-estado node)))
+                ;;  (print (state-score (no-estado node)))
+                ;;  (fresh-line)
+                ;;  (print_board (state-board (no-estado node)))
+                 
+
+                ;;  (format t "~%")
                 (let* 
                     ( (estado (no-estado node))
                     (current_score (+ (state-score estado) (funcall heur estado))));; f = g + h
                     (cond 
-                        ((< current_score score-min) current_score)  ;return estimated cost.
+                        ((< current_score score-min) (progn  current_score))  ;return estimated cost.
                         ((funcall objectivo?) (return-from iterative_deepning_A* (da-caminho best_node))) ;;;!return current state
                         (t
-                            (let ((max-score -1))
-                                (dolist (suc_node (generate_nos (problema-gera-sucessores problema estado) node))
-                                    (setf max-score (max max-score (prof suc_node score-min)))
+                            (let ((max-score -1) (a nil))
                                 
-                                    (if (< (state-score estado) (state-score (no-estado suc_node)))
-                                        (setf best_node suc_node))
-                                )
-                            max-score )))))
+                                (loop for suc_node in (generate_nos (problema-gera-sucessores problema estado) node) do
+                                   
+                                    (setf a (prof suc_node score-min (+ depth 1)))
+                                    (if (< max-score a ) (progn (setf max-score a)))
+                                    (if (< (state-score (no-estado best_node)) (state-score (no-estado suc_node)))
+                                        (progn 
+                                            (setf best_node suc_node)
+                                        )))
+                         
+
+                                max-score ))
+                    ))
+                    
+                )
             )
-            
+
             (let 
                 ((score-min most-positive-fixnum))
                 (loop
-                    (print score-min)
+                    (format t "|~f|~%" score-min)
                     (let 
-                        ((solucao (prof initial_node score-min)))
-                        
+                        ((sol (print "yaos")) (solucao (prof initial_node score-min 0)))
+                        (print "passed")
                         (if (< solucao score-min)
                             (setf score-min solucao)
-                            (return (da-caminho best_node))))))
+                            (return (da-caminho best_node)))
+                    )))
 
         )
     )
 )
+
 
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1234,6 +1235,8 @@
                    (1 2 2 2 2) 
                    (1 1 1 1 1)))
                    
+
+
 (defvar initial_state (make-state :board b3 :score 0))
 
 (defvar problema (cria-problema initial_state '(generate_successors) 
@@ -1243,7 +1246,7 @@
 
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'ida*)))
+(time (defvar A (procura problema 'profundidade)))
 (terpri)
 (print "RESULTS")
 (terpri)
