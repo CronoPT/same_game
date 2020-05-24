@@ -10,7 +10,7 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 100)
+(defvar *time_limit_seconds* 20)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -633,6 +633,23 @@
 )
 
 
+(defun h6 (state)
+    (let* ((board (state-board state))
+          (successors (generate_possible_actions board))
+          (dummy_board (copy_board board))
+          (expected_score 0))
+         (dolist (action successors)
+            (setf expected_score 
+                  (+  expected_score
+                      (score_move   
+                        (* 2
+                          (length
+                            (remove_cluster dummy_board (first action) (second action)))))))
+         )
+         expected_score
+    )
+)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  Randomized Heuristic - it increases the size of each cluster uniformly
@@ -812,6 +829,74 @@
         )
     )
 )
+
+
+
+
+;;;!!!!
+;; !!!!  
+;;
+;;
+
+(defun generate_nos (successores father)
+    (mapcar (lambda (succ) 
+                (make-no
+                    :estado succ 
+                    :pai father)
+            ) successores)
+)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;!!!!
+;;
+;;
+;;
+(defun iterative_deepning_A* (problema)
+                   
+                    
+    (let* ((initial_node  (make-no 
+                            :estado (problema-estado-inicial problema)
+                            :pai nil ))
+            (best_node initial_node)
+            (heur (problema-heuristica problema))
+            (objectivo? (problema-objectivo? problema)))
+
+        (labels 
+            (
+              (prof (node score-min)
+                (let* 
+                    ( (estado (no-estado node))
+                    (current_score (+ (state-score estado) (funcall heur estado))));; f = g + h
+                    (cond 
+                        ((< current_score score-min) current_score)  ;return estimated cost.
+                        ((funcall objectivo?) (return-from iterative_deepning_A* (da-caminho best_node))) ;;;!return current state
+                        (t
+                            (let ((max-score -1))
+                                (dolist (suc_node (generate_nos (problema-gera-sucessores problema estado) node))
+                                    (setf max-score (max max-score (prof suc_node score-min)))
+                                
+                                    (if (< (state-score estado) (state-score (no-estado suc_node)))
+                                        (setf best_node suc_node))
+                                )
+                            max-score )))))
+            )
+            
+            (let 
+                ((score-min most-positive-fixnum))
+                (loop
+                    (print score-min)
+                    (let 
+                        ((solucao (prof initial_node score-min)))
+                        
+                        (if (< solucao score-min)
+                            (setf score-min solucao)
+                            (return (da-caminho best_node))))))
+
+        )
+    )
+)
+
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
@@ -1013,7 +1098,7 @@
             ((string-equal tipo-procura "a*")
                 (a* problema :espaco-em-arvore? espaco-em-arvore?))
             ((string-equal tipo-procura "ida*") ;;TODO: ida*
-                (ida* problema :espaco-em-arvore? espaco-em-arvore?))
+                (iterative_deepning_A* problema ))
             ((string-equal tipo-procura "iterative_sampling")
                 (iterative_sampling_search problema))
             ((string-equal tipo-procura "limited_discrepancy")
@@ -1156,8 +1241,9 @@
                     :custo #'cost_same_game
                     :heuristica #'h6))
 
+
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'limited_discrepancy)))
+(time (defvar A (procura problema 'ida*)))
 (terpri)
 (print "RESULTS")
 (terpri)
