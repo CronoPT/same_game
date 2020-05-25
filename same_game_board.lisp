@@ -52,6 +52,45 @@
         (floor mb_bytes 1000000)
     )
 )
+;************************************************************************
+;*                          FILTROS - SUCCESSORS CUT                    *
+;************************************************************************
+
+
+(defun give_filter_on_best_score (best_score)
+    (lambda (state)
+        ;(print best_score)
+        (<= (+ (max_score (state-board state)) (state-score state)) best_score )
+    )
+)
+
+(defvar *nodes_cut* 0)
+
+(defun give_filter_function (filtro)
+    (lambda (successors) 
+        (let (  (prev successors) (after (remove-if filtro successors))) 
+             (if (not (eq (length prev) (length after)))
+               (progn (incf *nodes_cut* 1) (print *nodes_cut*)))
+            after
+            
+
+        )
+        
+    )
+)
+
+;; (defun give_filter_function (filtro)
+;;     (lambda (successors) 
+;;         successors
+        
+;;     )
+;; )
+
+(defun give_filter_function_on_best_score (best_score)
+    (give_filter_function
+        (give_filter_on_best_score best_score))
+)
+
 
 ;************************************************************************
 ;*                      STACK STRUCT - USED IN DFS                      *
@@ -178,7 +217,7 @@
                         (setf (gethash piece ht) 1)
                         (incf (gethash piece ht) 1)))))
         (loop for key being each hash-key of ht do
-            (format t " ~A -> ~A ~%" key (gethash key ht))
+            ;; (format t " ~A -> ~A ~%" key (gethash key ht))
             (incf max_score (score_move (gethash key ht))))
         max_score
     )
@@ -413,6 +452,15 @@
     move
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; ? Will we have to see the best position here in terms of score
+;; ? Or probably will end up returning always false
+;;
+(defun is_it_goal ()
+    (>= (get_elapsed_seconds) *time_limit_seconds*)
+)
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -499,46 +547,14 @@
 
 
 
-;*****************************
-;* RED procura.lisp PROBLEMA                       
-;*****************************
+;************************************************************************
+;*                       GENERATE SUCCESSORS                            *
+;************************************************************************
 
-(defstruct problema
-  estado-inicial
-  melhor-estado
-  operadores
-  objectivo?
-  custo
-  heuristica
-  hash
-  estado=)
-
-(defun cria-problema (estado-inicial operadores 
-		      &key estado-final
-			   objectivo?
-			   custo
-			   heuristica
-			   (hash #'sxhash)
-			   (estado= #'eql))
-  
-  (let ((obj? (cond ((functionp objectivo?) objectivo?)
-		    (estado-final
-		     #'(lambda (estado) 
-			 (funcall estado= estado estado-final)))
-		    (t (always t)))))
-    
-  (make-problema :estado-inicial estado-inicial
-         :melhor-estado estado-inicial
-		 :operadores operadores
-		 :objectivo? obj?
-		 :custo (or custo (always 1))
-		 :heuristica (or heuristica (always 0))
-		 :hash hash
-		 :estado= estado=)))
-
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Redifiniton from procura.lisp so we can pass a filtering function for successors
+;; Redifiniton from procura.lisp so we can pass a filtering function 
+;; for successors
 ;;
 (defun problema-gera-sucessores (problema estado &optional (filtro #'identity))
   (let ((sucessores nil))
@@ -548,9 +564,13 @@
 	       sucessores)))
     (incf *nos-expandidos*)
     (incf *nos-gerados* (length sucessores))
+    
     (funcall filtro sucessores)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;   THIS IS OUR OPERATOR THAT GENERATES BOARD AND IS USED IN 
+;;   problema-gera-sucessores
 ;;
 ;; Computes the possible actions and applies them, generating new states,
 ;; this is the only operator we have in the whole problem
@@ -572,14 +592,6 @@
     )
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; ? Will we have to see the best position here in terms of score
-;; ? Or probably will end up returning always false
-;;
-(defun is_it_goal ()
-    (>= (get_elapsed_seconds) *time_limit_seconds*)
-)
 
 
 
@@ -930,7 +942,13 @@
                 (when (>= (state-score (no-estado next_node)) (state-score (no-estado best_node)))
                     (setf best_node next_node))
 
-                (stack_push stack (generate_nodes (problema-gera-sucessores problema (no-estado next_node)) next_node))
+                (stack_push stack
+                    (generate_nodes
+                        (problema-gera-sucessores problema
+                            (no-estado next_node) 
+                            (give_filter_function_on_best_score (state-score (no-estado best_node))) )
+                             next_node))
+
                 (if (null closed)
                     (setf closed (list next_node))
                     (push next_node (cdr (last closed))) ; add expanded node to closed
@@ -1226,6 +1244,7 @@
     )
 )
 
+
 ;************************************************************************
 ;*                            TESTE                                     *
 ;************************************************************************
@@ -1371,73 +1390,31 @@
 
 (defvar *colors* 3)
 
-(defun run_for_results ()
-    (let(   (mean_expanded  0)
-            (mean_generated 0)
-            (mean_score     0)
-            (result         nil)
-            (board          nil)
-            (score_now      0)
-            (expanded_now   0)
-            (generated_now  0))
-        
-        (loop for shape in *shapes* do
-            (loop for approach in *approaches* do
-                (setf mean_expanded  0)
-                (setf mean_generated 0)
-                (setf mean_score     0)
-                (loop for i from 1 to *tries_per_shape* do
-                    (setf board  (generate_random_board (first shape) (second shape) *colors*))
-                    (setf result (resolve-same-game-for-test board approach))
-                    (setf score_now (state-score (first (last (first result)))))
-                    (setf expanded_now  (third result))
-                    (setf generated_now (fourth result))
-                    (incf mean_score score_now)
-                    (incf mean_expanded  expanded_now)
-                    (incf mean_generated generated_now)
-                )
-                (setf mean_expanded  (/ mean_expanded  *tries_per_shape*))
-                (setf mean_generated (/ mean_generated *tries_per_shape*))
-                (setf mean_score     (/ mean_score     *tries_per_shape*))
-                (terpri)
-                (format t "Strategy: ~A" approach)
-                (terpri)
-                (format t "Shape: ~dx~d" (first shape) (second shape))
-                (terpri)
-                (format t "Mean Expanded Nodes --> ~f" mean_expanded)
-                (terpri)
-                (format t "Mean Generated Nodes -> ~f" mean_generated)
-                (terpri)
-                (format t "Mean Score -----------> ~f" mean_score)
-                (terpri)
-            )
-        )
-    )
-)
-
-(run_for_results)
-
-;; (defvar initial_state (make-state :board b3 :score 0 :move nil))
-
-;; (defvar problema (cria-problema initial_state '(generate_successors) 
-;;                     :objectivo? #'is_it_goal
-;;                     :custo #'cost_same_game
-;;                     :heuristica #'h6))
+                   
+;(print (resolve-same-game boardinho 'a*.melhor.heuristica))
 
 
-;; (print "SPAM BEGINS")
-;; (time (defvar A (procura problema 'profundidade)))
-;; (terpri)
-;; (print "RESULTS")
-;; (terpri)
-;; (loop for state in (first A) do
-;;     (print_state state))
-;; (terpri)
-;; (format t "Expanded  nodes: ~d" (third  A))
-;; (terpri)
-;; (format t "Generated nodes: ~d" (fourth A))
-;; (terpri)
-;; (format t "Elapsed seconds ~f" (get_elapsed_seconds))
+ (defvar initial_state (make-state :board b1 :score 0 :move nil))
+
+ (defvar problema (cria-problema initial_state '(generate_successors) 
+                     :objectivo? #'is_it_goal
+                     :custo #'cost_same_game
+                     :heuristica #'h6))
+
+
+(print "SPAM BEGINS")
+(time (defvar A (procura problema 'profundidade)))
+(terpri)
+(print "RESULTS")
+(terpri)
+(loop for state in (first A) do
+    (print_state state))
+(terpri)
+(format t "Expanded  nodes: ~d" (third  A))
+(terpri)
+(format t "Generated nodes: ~d" (fourth A))
+(terpri)
+(format t "Elapsed seconds ~f" (get_elapsed_seconds))
 
 
 
