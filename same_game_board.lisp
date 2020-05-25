@@ -18,14 +18,14 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 60)
+(defvar *time_limit_seconds* 300)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 200)
+(defvar *memory_limit_megabytes* 1000000)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -69,20 +69,16 @@
 (defun give_filter_function (filtro)
     (lambda (successors) 
         (let (  (prev successors) (after (remove-if filtro successors))) 
-             (if (not (eq (length prev) (length after)))
-               (progn (incf *nodes_cut* 1) (print *nodes_cut*)))
+            (if (not (eq (length prev) (length after)))
+                (incf *nodes_cut* (- (length prev) (length  after))))
             after
-            
-
-        )
-        
+        )    
     )
 )
 
 ;; (defun give_filter_function (filtro)
 ;;     (lambda (successors) 
 ;;         successors
-        
 ;;     )
 ;; )
 
@@ -1394,7 +1390,7 @@
 ;(print (resolve-same-game boardinho 'a*.melhor.heuristica))
 
 
- (defvar initial_state (make-state :board b1 :score 0 :move nil))
+ (defvar initial_state (make-state :board boardinho :score 0 :move nil))
 
  (defvar problema (cria-problema initial_state '(generate_successors) 
                      :objectivo? #'is_it_goal
@@ -1415,6 +1411,8 @@
 (format t "Generated nodes: ~d" (fourth A))
 (terpri)
 (format t "Elapsed seconds ~f" (get_elapsed_seconds))
+(terpri)
+(format t "Branches pruned ~d" *nodes_cut*)
 
 
 
