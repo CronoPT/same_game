@@ -1,3 +1,5 @@
+;;
+;;!!!!!  PACKAGE
 ;(in-package :user)
 
 ;; (load "procura.lisp")
@@ -495,18 +497,6 @@
     (>= (get_elapsed_seconds) *time_limit_seconds*)
 )
 
-;; (defun is_it_goal (state)
-;;     (let ((board (state-board state)))
-;;         (loop for l in board do
-;;         (loop for c in l do
-;;             (if (not (null c))
-;;                 (return-from is_it_goal nil)))))
-;;     T
-;; )
-
-;; (defun is_it_goal (state)
-;;     (> (state-score state) 150)
-;; )
 
 
 
@@ -666,7 +656,10 @@
     )
 )
 
-
+;;;;;
+;;  !PARA APGAR
+;;  HEURISTICA DE TESTE 
+;;
 (defun h7 (state) (score_move(get_remaining_pieces (state-board state))))
  
 ;************************************************************************
