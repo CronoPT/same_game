@@ -471,6 +471,7 @@
 ;;
 ;; Computes the possible actions and applies them, generating new states,
 ;; this is the only operator we have in the whole problem
+;; e.g. ( BOARD1, BOARD2, BOARD3...)
 ;;
 (defun generate_successors (state)
     (if (>= (get_megabytes_used) *memory_limit_megabytes*)
@@ -666,6 +667,86 @@
 ;*                         SEARCH ALGORITHMS                            *
 ;************************************************************************
 
+;****************************
+;*   STRUCTURES OF NODES                            
+;****************************
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A different node that allows us to keep track of the depth of nodes
+;;
+(defstruct (node_depth (:include no))
+    depth
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A different node that allows us to keep track of discrepancies of the
+;; path of a given nodde
+;;
+(defstruct (node_discrepancy (:include no))
+    discrepancies
+    heuristic
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; From a list of states and their parent node, generates a list of nodes
+;;
+(defun generate_nodes (successores father)
+    (mapcar (lambda (succ) 
+                (make-node_depth 
+                    :estado succ 
+                    :pai father
+                    :depth (+ 1 (node_depth-depth father)))
+            ) successores)
+)
+
+
+(defun generate_nos (successores father)
+    (mapcar (lambda (succ) 
+                (make-no
+                    :estado succ 
+                    :pai father)
+            ) successores)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; From a list of states and their parent node, generates a list of nodes
+;;
+(defun generate_nodes_discrepancy_max (successores father heuristic)
+    (mapcar (lambda (succ) 
+                (make-node_discrepancy
+                    :estado succ 
+                    :pai father
+                    :discrepancies (node_discrepancy-discrepancies father)
+                    :heuristic (funcall heuristic succ))
+            ) successores)
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; From a list of states and their parent node, generates a list of nodes
+;; All discrepancies are incremented by one but then the best node is 
+;; decremented in the function successores_non_max_discrepancy
+;;
+(defun generate_nodes_discrepancy_non_max (successores father heuristic)
+    (mapcar (lambda (succ) 
+                (make-node_discrepancy
+                    :estado succ 
+                    :pai father
+                    :discrepancies (+ 1 (node_discrepancy-discrepancies father))
+                    :heuristic (funcall heuristic succ))
+            ) successores)
+)
+
+;****************************
+;* AUX FUNCTIONS                           
+;****************************
+
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
 ;;! OG COMMENT - Funcoes a utilizar para a procura em largura-primeiro.
@@ -679,6 +760,25 @@
 	        (> n1 n2)))
         (merge 'list (sort nos-a* #'maior :key #'no-a*-f) abertos
 	        #'maior :key #'no-a*-f))
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; If the new solutions returned by DFS is not as good as the one before
+;; two things can happen: 1) the time is up and the solution is partial
+;; or 2) the DFS swept the search space twice and already returned the 
+;; the best position possible, in both cases, we want to finish the IDS
+;;
+(defun new_best_than_old (new old)
+    (> (state-score (car (last new))) (state-score (car (last old))))
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Comparing nodes by its heuristic value
+;;
+(defun compare_nodes (node1 node2)
+    (> (node_discrepancy-heuristic node1) (node_discrepancy-heuristic node2))
 )
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -715,27 +815,11 @@
             (espaco-expande-no espaco proximo-no))))
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; A different node that allows us to keep track of the depth of nodes
-;;
-(defstruct (node_depth (:include no))
-    depth
-)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; From a list of states and their parent node, generates a list of nodes
-;;
-(defun generate_nodes (successores father)
-    (mapcar (lambda (succ) 
-                (make-node_depth 
-                    :estado succ 
-                    :pai father
-                    :depth (+ 1 (node_depth-depth father)))
-            ) successores)
-)
 
+;****************************
+;* ALGORITHMS                         
+;****************************
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;?  MAYBE DO RECURSIVE W/ A depth_first_search(problam profundida-maxima melhor nó)
 ;;?  EM VEZ DA STACK
@@ -773,16 +857,7 @@
     )
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; If the new solutions returned by DFS is not as good as the one before
-;; two things can happen: 1) the time is up and the solution is partial
-;; or 2) the DFS swept the search space twice and already returned the 
-;; the best position possible, in both cases, we want to finish the IDS
-;;
-(defun new_best_than_old (new old)
-    (> (state-score (car (last new))) (state-score (car (last old))))
-)
+
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
@@ -812,82 +887,44 @@
 
 
 
-;;;!!!!
-;; !!!!  
-;;
-;;
-
-(defun generate_nos (successores father)
-    (mapcar (lambda (succ) 
-                (make-no
-                    :estado succ 
-                    :pai father)
-            ) successores)
-)
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;!!!!
 ;;
 ;;
 ;;
-(defun iterative_deepning_A* (problema)
-                   
-                    
+(defun iterative_deepning_A* (problema)                 
     (let* ((initial_node  (make-no 
                             :estado (problema-estado-inicial problema)
                             :pai nil ))
             (best_node initial_node)
             (heur (problema-heuristica problema))
             (objectivo? (problema-objectivo? problema)))
-
         (labels 
-            (
-              (prof (node score-min depth)
-                ;;  (format t "(~A) H(~A)" depth (funcall heur (no-estado node)))
-                ;;  (print (state-score (no-estado node)))
-                ;;  (fresh-line)
-                ;;  (print_board (state-board (no-estado node)))
-                 
-
-                ;;  (format t "~%")
-                (let* 
+            ((prof (node score-min depth)
+                  (let* 
                     ( (estado (no-estado node))
                     (current_score (+ (state-score estado) (funcall heur estado))));; f = g + h
                     (cond 
-                        ((< current_score score-min) (progn  current_score))  ;return estimated cost.
-                        ((funcall objectivo?) (return-from iterative_deepning_A* (da-caminho best_node))) ;;;!return current state
+                        ((< current_score score-min) current_score)  ;return estimated cost.
+                        ((funcall objectivo?) (return-from iterative_deepning_A* (da-caminho best_node))) 
                         (t
-                            (let ((max-score -1) (a nil))
-                                
+                            (let ((max-score 0) (result nil))
                                 (loop for suc_node in (generate_nos (problema-gera-sucessores problema estado) node) do
-                                   
-                                    (setf a (prof suc_node score-min (+ depth 1)))
-                                    (if (< max-score a ) (progn (setf max-score a)))
+                                    (setf result (prof suc_node score-min (+ depth 1)))
+                                    (if (< max-score result ) (setf max-score result))
                                     (if (< (state-score (no-estado best_node)) (state-score (no-estado suc_node)))
-                                        (progn 
-                                            (setf best_node suc_node)
-                                        )))
-                         
-
-                                max-score ))
-                    ))
-                    
-                )
-            )
-
+                                        (setf best_node suc_node)))
+                                max-score )))) 
+            ))
             (let 
                 ((score-min most-positive-fixnum))
                 (loop
-                    (format t "|~f|~%" score-min)
                     (let 
-                        ((sol (print "yaos")) (solucao (prof initial_node score-min 0)))
-                        (print "passed")
+                        ((solucao (prof initial_node score-min 0)))
                         (if (< solucao score-min)
                             (setf score-min solucao)
-                            (return (da-caminho best_node)))
-                    )))
-
+                            (return (da-caminho best_node))))))
         )
     )
 )
@@ -938,30 +975,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; A different node that allows us to keep track of discrepancies of the
-;; path of a given nodde
-;;
-(defstruct (node_discrepancy (:include no))
-    discrepancies
-    heuristic
-)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; From a list of states and their parent node, generates a list of nodes
-;;
-(defun generate_nodes_discrepancy_max (successores father heuristic)
-    (mapcar (lambda (succ) 
-                (make-node_discrepancy
-                    :estado succ 
-                    :pai father
-                    :discrepancies (node_discrepancy-discrepancies father)
-                    :heuristic (funcall heuristic succ))
-            ) successores)
-)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 ;; Expanding a node on a path where the limit for discrepancies has
 ;; already been reached - it will return only the best node according to
 ;; the heuristic
@@ -986,30 +999,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; From a list of states and their parent node, generates a list of nodes
-;; All discrepancies are incremented by one but then the best node is 
-;; decremented in the function successores_non_max_discrepancy
-;;
-(defun generate_nodes_discrepancy_non_max (successores father heuristic)
-    (mapcar (lambda (succ) 
-                (make-node_discrepancy
-                    :estado succ 
-                    :pai father
-                    :discrepancies (+ 1 (node_discrepancy-discrepancies father))
-                    :heuristic (funcall heuristic succ))
-            ) successores)
-)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Comparing nodes by its heuristic value
-;;
-(defun compare_nodes (node1 node2)
-    (> (node_discrepancy-heuristic node1) (node_discrepancy-heuristic node2))
-)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 ;; Expanding a node on a path where the limit for discrepancies has not
 ;; yet been reached - it will return all the successors but every one
 ;; except for the best, will have the field 'discrepancies' incremented
@@ -1020,7 +1009,7 @@
         (when (null successores)
             (return-from successores_non_max_discrepancy nil))
         (setf successores (sort successores 'compare_nodes))
-        (decf (node_discrepancy-discrepancies (nth 0 successores)) 1)
+        (decf (node_discrepancy-discrepancies (nth 0 successores)) 1) ;The best node did not have a discrepancy.
         successores
     )
 )
