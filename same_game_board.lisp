@@ -10,6 +10,12 @@
 ;************************************************************************
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+;; Set up randomness in Lisp
+;;
+(setf *random-state* (make-random-state t))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 ;; Limit execution time of our program in seconds
 ;;
 (defvar *time_limit_seconds* 200)
@@ -159,6 +165,26 @@
           board2
     )
 )
+
+
+  
+(defun max_score (board)
+    (let
+        ( (ht (make-hash-table)) (max_score 0))
+        (loop for l in board do
+            (loop for piece in l do
+                (when (numberp piece) 
+                    (if (null (gethash piece ht) )
+                        (setf (gethash piece ht) 1)
+                        (incf (gethash piece ht) 1)))))
+        (loop for key being each hash-key of ht do
+            (format t " ~A -> ~A ~%" key (gethash key ht))
+            (incf max_score (score_move (gethash key ht))))
+        max_score
+    )
+    
+)
+
 
 ;************************************************************************
 ;*                  BOARD - CLUSTER OPERATIONS OPERATIONS               *
@@ -447,6 +473,10 @@
         (make-state :board new_board :score new_score :move position)
     )
 )
+
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; RETURNS a list with actions ((l,c) (l,c)...). One actions per cluster
@@ -466,6 +496,59 @@
           possible_actions
     )   
 )
+
+
+
+;*****************************
+;* RED procura.lisp PROBLEMA                       
+;*****************************
+
+(defstruct problema
+  estado-inicial
+  melhor-estado
+  operadores
+  objectivo?
+  custo
+  heuristica
+  hash
+  estado=)
+
+(defun cria-problema (estado-inicial operadores 
+		      &key estado-final
+			   objectivo?
+			   custo
+			   heuristica
+			   (hash #'sxhash)
+			   (estado= #'eql))
+  
+  (let ((obj? (cond ((functionp objectivo?) objectivo?)
+		    (estado-final
+		     #'(lambda (estado) 
+			 (funcall estado= estado estado-final)))
+		    (t (always t)))))
+    
+  (make-problema :estado-inicial estado-inicial
+         :melhor-estado estado-inicial
+		 :operadores operadores
+		 :objectivo? obj?
+		 :custo (or custo (always 1))
+		 :heuristica (or heuristica (always 0))
+		 :hash hash
+		 :estado= estado=)))
+
+;;;;;;;;;;
+;;
+;; Redifiniton from procura.lisp so we can pass a filtering function for successors
+;;
+(defun problema-gera-sucessores (problema estado &optional (filtro #'identity))
+  (let ((sucessores nil))
+    (dolist (operador (problema-operadores problema))
+      (setf sucessores
+	(nconc (funcall operador estado)
+	       sucessores)))
+    (incf *nos-expandidos*)
+    (incf *nos-gerados* (length sucessores))
+    (funcall filtro sucessores)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -1133,8 +1216,24 @@
 )
 
 ;************************************************************************
-;*                            MAIN                                      *
+;*                            TESTE                                     *
 ;************************************************************************
+
+(defun generate_random_board (lines columns num_colors)
+    (let(   (board nil)
+            (line  nil))
+        (loop for l from 1 to lines do
+            (loop for c from 1 to columns do
+                (setf line (append line (list (+ (random num_colors) 1))))
+            )
+            (setf board (append board (list line)))
+            (setf line nil)
+        )
+        board
+    )
+)
+
+
 ;; 10x4 board with 3 colors
  (defvar b1 '((2 1 3 2 3 3 2 3 3 3) 
               (1 3 2 2 1 3 3 2 2 2) 
@@ -1180,6 +1279,24 @@
              (3 1 3 4 4 1 5 1 5 4) 
              (1 3 1 5 2 4 4 3 3 2)
              (4 2 4 2 2 5 3 1 2 1)))
+
+;; 15x20 board with 5 colors
+(defvar b5 '((1 1 1 1 1 1 1 1 1 1 5 1 1 1 2 1 4 2 1 2)
+             (1 1 1 1 1 1 1 1 1 1 5 3 4 2 2 2 2 1 3 1)
+             (1 1 1 1 1 1 1 1 1 1 5 5 3 5 5 3 1 5 4 3)
+             (1 1 1 1 1 1 1 1 1 1 5 3 4 2 2 2 2 1 3 1)
+             (1 1 1 1 1 1 1 1 1 1 3 5 5 2 2 5 2 2 4 2)
+             (1 1 1 1 1 1 1 1 1 1 1 1 5 3 1 1 2 5 5 5)
+             (1 1 1 1 1 1 1 1 1 1 4 2 4 2 2 5 3 1 2 1)
+             (1 1 1 1 1 1 1 1 1 1 4 3 1 3 5 1 5 3 4 2)
+             (2 3 3 2 5 4 3 4 4 4 3 5 5 2 2 5 2 2 4 2)
+             (3 5 5 2 2 5 2 2 4 2 5 3 5 3 3 3 3 4 2 2)
+             (1 4 2 3 2 4 5 5 4 2 4 3 3 2 4 2 4 2 2 5)
+             (4 1 3 2 4 3 4 4 3 1 1 1 1 1 1 2 3 4 5 3)
+             (4 2 4 2 2 5 3 1 2 1 1 1 1 1 1 1 5 1 5 4) 
+             (1 3 1 5 2 4 4 3 3 1 1 1 1 1 1 5 3 1 2 1)
+             (4 2 4 2 2 5 3 1 2 1 1 1 1 1 1 3 3 4 2 2)))
+
 
 ;; (do_action b1 '(1 0))
 ;; (print_board b1)
@@ -1245,6 +1362,9 @@
                     (2 2 2 1 3) 
                     (1 2 2 2 2) 
                     (1 1 1 1 1)))
+
+(print (max_score boardinho))
+
                    
 (print (resolve-same-game boardinho 'a*.melhor.heuristica))
 
