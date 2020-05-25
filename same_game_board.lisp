@@ -376,11 +376,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; A state in our problem corresponds to a board and the score of all 
-;; the playes doen up until now
+;; the plays done up until now as well as the move that originated the 
+;; state
 ;;
 (defstruct state
     board
     score
+    move
 )
 
 
@@ -440,7 +442,7 @@
            (new_board (copy_board board))
            (new_score (+ (do_action new_board position) score)))
         
-        (make-state :board new_board :score new_score)
+        (make-state :board new_board :score new_score :move position)
     )
 )
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1121,6 +1123,33 @@
     )
 )
 
+(defun resolve-same-game (board strategy)
+    (let*(  (initial_state (make-state :board board :score 0 :move nil))
+            (problema (cria-problema initial_state '(generate_successors) 
+                                                   :objectivo? #'is_it_goal
+                                                   :custo #'cost_same_game
+                                                   :heuristica #'h6))
+            (solution nil)
+        )
+
+        (cond 
+            ((string-equal strategy "melhor.abordagem")
+                (format t "What the hell am I doing here? Cause I'm a creep...."))
+            ((string-equal strategy "a*.melhor.heuristica")
+                (setf solution (procura problema 'a*)))
+            ((string-equal strategy "a*.melhor.heuristica.alternativa")
+                (setf (problema-heuristica problema) #'h5)
+                (setf solution (procura problema 'a*)))
+            ((string-equal strategy "sondagem.iterativa")
+                (setf solution (procura problema 'iterative_sampling)))
+            ((string-equal strategy "abordagem.alternativa")
+                (setf solution (procura problema 'limited_discrepancy)))
+        )
+
+        (loop for state in (rest (first solution)) collect (state-move state))
+    )
+)
+
 ;************************************************************************
 ;*                            MAIN                                      *
 ;************************************************************************
@@ -1131,44 +1160,44 @@
               (1 3 3 3 1 3 1 1 1 3)))
 
 ;; ;; 10x4 board with 5 colors 
-;; (defvar b2 '((4 3 3 1 2 5 1 2 1 5) 
-;;              (2 4 4 4 1 5 2 4 1 2)
-;;              (5 2 4 1 4 5 1 2 5 4)
-;;              (1 3 1 4 2 5 2 5 4 5)))
+(defvar b2 '((4 3 3 1 2 5 1 2 1 5) 
+             (2 4 4 4 1 5 2 4 1 2)
+             (5 2 4 1 4 5 1 2 5 4)
+             (1 3 1 4 2 5 2 5 4 5)))
 
 ;; 15x10 board with 3 colors
  (defvar b3'((3 3 3 2 1 2 3 1 3 1)
-              (1 1 2 3 3 1 1 1 3 1)
-              (3 3 1 2 1 1 3 2 1 1)
-              (3 3 2 3 3 1 3 3 2 2)
-              (3 2 2 2 3 3 2 1 2 2)
-              (3 1 2 2 2 2 1 2 1 3)
-              (2 3 2 1 2 1 1 2 2 1)
-              (2 2 3 1 1 1 3 2 1 3)
-              (1 3 3 1 1 2 3 1 3 1) 
-              (2 1 2 2 1 3 1 1 2 3)
-              (2 1 1 3 3 3 1 2 3 1)
-              (1 2 1 1 3 2 2 1 2 2)
-              (2 1 3 2 1 2 1 3 2 3)
-              (1 2 1 3 1 2 2 3 2 3)
-              (3 3 1 2 3 1 1 2 3 1)))
+             (1 1 2 3 3 1 1 1 3 1)
+             (3 3 1 2 1 1 3 2 1 1)
+             (3 3 2 3 3 1 3 3 2 2)
+             (3 2 2 2 3 3 2 1 2 2)
+             (3 1 2 2 2 2 1 2 1 3)
+             (2 3 2 1 2 1 1 2 2 1)
+             (2 2 3 1 1 1 3 2 1 3)
+             (1 3 3 1 1 2 3 1 3 1) 
+             (2 1 2 2 1 3 1 1 2 3)
+             (2 1 1 3 3 3 1 2 3 1)
+             (1 2 1 1 3 2 2 1 2 2)
+             (2 1 3 2 1 2 1 3 2 3)
+             (1 2 1 3 1 2 2 3 2 3)
+             (3 3 1 2 3 1 1 2 3 1)))
 
 ;; 15x10 board with 5 colors
-;; (defvar b4 '((5 1 1 1 2 1 4 2 1 2)
-;;              (5 5 5 4 1 2 2 1 4 5)
-;;              (5 5 3 5 5 3 1 5 4 3)
-;;              (3 3 3 2 4 3 1 3 5 1)
-;;              (5 3 4 2 2 2 2 1 3 1)
-;;              (1 1 5 3 1 1 2 5 5 5)
-;;              (4 2 5 1 4 5 4 1 1 1)
-;;              (5 3 5 3 3 3 3 4 2 2)
-;;              (2 3 3 2 5 4 3 4 4 4)
-;;              (3 5 5 2 2 5 2 2 4 2)
-;;              (1 4 2 3 2 4 5 5 4 2)
-;;              (4 1 3 2 4 3 4 4 3 1)
-;;              (3 1 3 4 4 1 5 1 5 4) 
-;;              (1 3 1 5 2 4 4 3 3 2)
-;;              (4 2 4 2 2 5 3 1 2 1)))
+(defvar b4 '((5 1 1 1 2 1 4 2 1 2)
+             (5 5 5 4 1 2 2 1 4 5)
+             (5 5 3 5 5 3 1 5 4 3)
+             (3 3 3 2 4 3 1 3 5 1)
+             (5 3 4 2 2 2 2 1 3 1)
+             (1 1 5 3 1 1 2 5 5 5)
+             (4 2 5 1 4 5 4 1 1 1)
+             (5 3 5 3 3 3 3 4 2 2)
+             (2 3 3 2 5 4 3 4 4 4)
+             (3 5 5 2 2 5 2 2 4 2)
+             (1 4 2 3 2 4 5 5 4 2)
+             (4 1 3 2 4 3 4 4 3 1)
+             (3 1 3 4 4 1 5 1 5 4) 
+             (1 3 1 5 2 4 4 3 3 2)
+             (4 2 4 2 2 5 3 1 2 1)))
 
 ;; (do_action b1 '(1 0))
 ;; (print_board b1)
@@ -1230,34 +1259,35 @@
 
 ;! SOLVING PROBLEM WITH BFS EXAMPLE
 
-(defvar boardinho'((1 2 2 3 3) 
-                   (2 2 2 1 3) 
-                   (1 2 2 2 2) 
-                   (1 1 1 1 1)))
+(defvar boardinho '((1 2 2 3 3) 
+                    (2 2 2 1 3) 
+                    (1 2 2 2 2) 
+                    (1 1 1 1 1)))
                    
+(print (resolve-same-game boardinho 'a*.melhor.heuristica))
 
 
-(defvar initial_state (make-state :board b3 :score 0))
+;; (defvar initial_state (make-state :board b3 :score 0 :move nil))
 
-(defvar problema (cria-problema initial_state '(generate_successors) 
-                    :objectivo? #'is_it_goal
-                    :custo #'cost_same_game
-                    :heuristica #'h6))
+;; (defvar problema (cria-problema initial_state '(generate_successors) 
+;;                     :objectivo? #'is_it_goal
+;;                     :custo #'cost_same_game
+;;                     :heuristica #'h6))
 
 
-(print "SPAM BEGINS")
-(time (defvar A (procura problema 'profundidade)))
-(terpri)
-(print "RESULTS")
-(terpri)
-(loop for state in (first A) do
-    (print_state state))
-(terpri)
-(format t "Expanded  nodes: ~d" (third  A))
-(terpri)
-(format t "Generated nodes: ~d" (fourth A))
-(terpri)
-(format t "Elapsed seconds ~f" (get_elapsed_seconds))
+;; (print "SPAM BEGINS")
+;; (time (defvar A (procura problema 'profundidade)))
+;; (terpri)
+;; (print "RESULTS")
+;; (terpri)
+;; (loop for state in (first A) do
+;;     (print_state state))
+;; (terpri)
+;; (format t "Expanded  nodes: ~d" (third  A))
+;; (terpri)
+;; (format t "Generated nodes: ~d" (fourth A))
+;; (terpri)
+;; (format t "Elapsed seconds ~f" (get_elapsed_seconds))
 
 
 
