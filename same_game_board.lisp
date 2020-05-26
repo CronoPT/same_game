@@ -17,7 +17,7 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 300)
+(defvar *time_limit_seconds* 60)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -30,7 +30,7 @@
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 150)
+(defvar *memory_limit_megabytes* 140)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -1144,16 +1144,21 @@
 (defun successores_max_discrepancy (to_expand problema)
     (let*(  (heuristic (problema-heuristica problema))
             (max_heuristic_val 0)
-            (successores (generate_nodes_discrepancy_max (problema-gera-sucessores problema (no-estado to_expand)) to_expand heuristic)))
+            (successores (generate_nodes_discrepancy_max (problema-gera-sucessores problema
+                                (no-estado to_expand)) 
+                                to_expand heuristic))
+            (best_node nil))
+
         (when (null successores)
             (return-from successores_max_discrepancy nil))
+        (setf best_node (nth 0 successores))
         (loop for node in successores do
             (when (> (node_discrepancy-heuristic node) max_heuristic_val)
                 (setf max_heuristic_val (node_discrepancy-heuristic node)))
         )
         (loop for node in successores do
             (when (eq (node_discrepancy-heuristic node) max_heuristic_val)
-                (return node))
+                (return (list node best_node)))
         )
     )
 )
@@ -1169,12 +1174,14 @@
             (successores (generate_nodes_discrepancy_non_max (problema-gera-sucessores problema
                                 (no-estado to_expand) 
                                 (give_filter_function_on_best_score (state-score (no-estado best_node)))) 
-                                                             to_expand heuristic)))
+                                                             to_expand heuristic))
+            (best_node nil))
         (when (null successores)
             (return-from successores_non_max_discrepancy nil))
+        (setf best_node (nth 0 successores))
         (setf successores (sort successores 'compare_nodes))
         (decf (node_discrepancy-discrepancies (nth 0 successores)) 1) ;The best node did not have a discrepancy.
-        successores
+        (list successores best_node)
     )
 )
 
@@ -1200,7 +1207,9 @@
             (next_node nil)
             (objectivo? (problema-objectivo? problema))
             (allowed_discrepancies 0)
-            (successor_nodes))
+            (successor_nodes       nil)
+            (best_node_next_gen    nil)
+            (generation_result     nil))
         (stack_push stack initial_node)
         (loop
             (setf stack (stack_create))
@@ -1212,13 +1221,13 @@
 	                (return-from limited_discrepancy_search (da-caminho best_node)))
                 (setf next_node (stack_pop stack))
                 (if (>= (node_discrepancy-discrepancies next_node) allowed_discrepancies)
-                    (setf successor_nodes (successores_max_discrepancy next_node problema))
-                    (setf successor_nodes (successores_non_max_discrepancy next_node problema best_node)))
-                (stack_push stack successor_nodes)
+                    (setf generation_result (successores_max_discrepancy next_node problema))
+                    (setf generation_result (successores_non_max_discrepancy next_node problema best_node)))
+                (setf successor_nodes    (first  generation_result))
+                (setf best_node_next_gen (second generation_result))
                 (when (not (null successor_nodes))
-                    (if (listp successor_nodes)
-                        (setf best_node (determine_best_node best_node (nth 0 (sort successor_nodes 'compare_nodes_score))))
-                        (setf best_node (determine_best_node best_node successor_nodes))))
+                    (stack_push stack successor_nodes)
+                    (setf best_node (determine_best_node best_node best_node_next_gen)))
             )
             (incf allowed_discrepancies 1)
         )
@@ -1401,28 +1410,28 @@
                     (1 2 2 2 2) 
                     (1 1 1 1 1)))
 
-(print (resolve-same-game b3 'a*.melhor.heuristica))
+;; (print (resolve-same-game b3 'abordagem.alternativa))
 
-;; (defvar initial_state (make-state :board b3 :score 0 :move nil))
+(defvar initial_state (make-state :board b3 :score 0 :move nil))
 
-;; (defvar problema (cria-problema initial_state '(generate_successors) 
-;;                     :objectivo? #'is_it_goal
-;;                     :custo #'cost_same_game
-;;                     :heuristica #'h6))
+(defvar problema (cria-problema initial_state '(generate_successors) 
+                    :objectivo? #'is_it_goal
+                    :custo #'cost_same_game
+                    :heuristica #'h6))
 
 
-;; (print "SPAM BEGINS")
-;; (time (defvar A (procura problema 'largura)))
-;; (terpri)
-;; (print "RESULTS")
-;; (terpri)
-;; (loop for state in (first A) do
-;;     (print_state state))
-;; (terpri)
-;; (format t "Expanded  nodes: ~d" (third  A))
-;; (terpri)
-;; (format t "Generated nodes: ~d" (fourth A))
-;; (terpri)
-;; (format t "Elapsed seconds ~f" (get_elapsed_seconds))
-;; (terpri)
-;; (format t "Branches pruned ~d" *nodes_cut*)
+(print "SPAM BEGINS")
+(time (defvar A (procura problema 'limited_discrepancy)))
+(terpri)
+(print "RESULTS")
+(terpri)
+(loop for state in (first A) do
+    (print_state state))
+(terpri)
+(format t "Expanded  nodes: ~d" (third  A))
+(terpri)
+(format t "Generated nodes: ~d" (fourth A))
+(terpri)
+(format t "Elapsed seconds ~f" (get_elapsed_seconds))
+(terpri)
+(format t "Branches pruned ~d" *nodes_cut*)
