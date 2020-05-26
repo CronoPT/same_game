@@ -1073,7 +1073,6 @@
             (let 
                 ((score-min most-positive-fixnum))
                 (loop
-                    (format t "Um print qualquer ~d" score-min)
                     (let
                         ((solucao (prof initial_node score-min 0)))
                         (if (< solucao score-min)
