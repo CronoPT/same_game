@@ -17,7 +17,7 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 60)
+(defvar *time_limit_seconds* 300)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -30,7 +30,7 @@
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 1000000000)
+(defvar *memory_limit_megabytes* 150)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -663,16 +663,6 @@
     )
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Just so we can use Uniform Cost Search ' might be good to prove the
-;; value of the heuristics we wrote
-;;
-(defun h2 (state) 
-    (ignore state)
-    0
-)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; This heuristic is very similiar to h4, but instead of estimating -1 
@@ -975,7 +965,7 @@
 ;;! but at least it allows us to keep the search within the time 
 ;;! and memory limit, it is an iterative search, not recursive.
 ;;!
-(defun depth_first_search (problema profundidade-maxima)
+(defun profundidade-primeiro (problema profundidade-maxima)
     (let*(  (stack (stack_create))
             (closed '())
             (initial_node (make-node_depth :estado (problema-estado-inicial problema) 
@@ -989,11 +979,11 @@
         (stack_push stack initial_node)
         (loop
             (when (stack_empty stack)
-                (return-from depth_first_search (da-caminho best_node)))
+                (return-from profundidade-primeiro (da-caminho best_node)))
             (setf next_node (stack_pop stack))
             (unless (or (member next_node closed) (> (node_depth-depth next_node) profundidade-maxima))
                 (when (funcall objetivo?)
-                    (return-from depth_first_search (da-caminho best_node)))
+                    (return-from profundidade-primeiro (da-caminho best_node)))
                 (setf successor_nodes (generate_nodes
                                         (problema-gera-sucessores problema
                                             (no-estado next_node) 
@@ -1019,20 +1009,20 @@
 ;;! 
 ;;! Ideally we would use 
 ;;!
-(defun iterative_deepening_search (problema profundidade-maxima)
+(defun profundidade-iterativa (problema profundidade-maxima)
     (let(   (iteration 0)
             (best_solution nil)
             (current_solution nil)
             (objectivo? (problema-objectivo? problema)))
         (loop
             (when (or (funcall objectivo?) (> iteration profundidade-maxima))
-                (return-from iterative_deepening_search best_solution))
-            (setf current_solution (depth_first_search problema iteration))
+                (return-from profundidade-iterativa best_solution))
+            (setf current_solution (profundidade-primeiro problema iteration))
             (if (null best_solution)
                 (setf best_solution current_solution)
                 (if (new_best_than_old current_solution best_solution)
                     (setf best_solution current_solution)
-                    (return-from iterative_deepening_search best_solution)
+                    (return-from profundidade-iterativa best_solution)
                 )
             )
             (incf iteration 1)
@@ -1045,7 +1035,7 @@
 ;;
 ;; Iterative Deepening A*  
 ;;
-(defun iterative_deepning_A* (problema)                 
+(defun ida* (problema)                 
     (let* ((initial_node  (make-no 
                             :estado (problema-estado-inicial problema)
                             :pai nil ))
@@ -1059,7 +1049,7 @@
                       (current_score (+ (state-score estado) (funcall heur estado))));; f = g + h
                     (cond 
                         ((< current_score score-min) current_score)  ;return estimated cost.
-                        ((funcall objectivo?) (return-from iterative_deepning_A* (da-caminho best_node))) 
+                        ((funcall objectivo?) (return-from ida* (da-caminho best_node))) 
                         (t
                             (let(   (max-score 0) (result nil)
                                     (successor_nodes (generate_nos 
@@ -1256,13 +1246,13 @@
                 (largura-primeiro problema 
                             :espaco-em-arvore? espaco-em-arvore?))
             ((string-equal tipo-procura "profundidade")
-                (depth_first_search problema profundidade-maxima))
+                (profundidade-primeiro problema profundidade-maxima))
             ((string-equal tipo-procura "profundidade-iterativa")
-                (iterative_deepening_search problema profundidade-maxima))
+                (profundidade-iterativa problema profundidade-maxima))
             ((string-equal tipo-procura "a*")
                 (a* problema :espaco-em-arvore? espaco-em-arvore?))
             ((string-equal tipo-procura "ida*")
-                (iterative_deepning_A* problema ))
+                (ida* problema ))
             ((string-equal tipo-procura "iterative_sampling")
                 (iterative_sampling_search problema))
             ((string-equal tipo-procura "limited_discrepancy")
@@ -1406,34 +1396,33 @@
              (4 2 4 2 2 5 3 1 2 1 1 1 1 1 1 3 3 4 2 2)))
 
 
-
-;! SOLVING PROBLEM WITH BFS EXAMPLE
-
 (defvar boardinho '((1 2 2 3 3) 
                     (2 2 2 1 3) 
                     (1 2 2 2 2) 
                     (1 1 1 1 1)))
 
-(defvar initial_state (make-state :board b3 :score 0 :move nil))
+(print (resolve-same-game b3 'a*.melhor.heuristica))
 
-(defvar problema (cria-problema initial_state '(generate_successors) 
-                    :objectivo? #'is_it_goal
-                    :custo #'cost_same_game
-                    :heuristica #'h6))
+;; (defvar initial_state (make-state :board b3 :score 0 :move nil))
+
+;; (defvar problema (cria-problema initial_state '(generate_successors) 
+;;                     :objectivo? #'is_it_goal
+;;                     :custo #'cost_same_game
+;;                     :heuristica #'h6))
 
 
-(print "SPAM BEGINS")
-(time (defvar A (procura problema 'profundidade)))
-(terpri)
-(print "RESULTS")
-(terpri)
-(loop for state in (first A) do
-    (print_state state))
-(terpri)
-(format t "Expanded  nodes: ~d" (third  A))
-(terpri)
-(format t "Generated nodes: ~d" (fourth A))
-(terpri)
-(format t "Elapsed seconds ~f" (get_elapsed_seconds))
-(terpri)
-(format t "Branches pruned ~d" *nodes_cut*)
+;; (print "SPAM BEGINS")
+;; (time (defvar A (procura problema 'largura)))
+;; (terpri)
+;; (print "RESULTS")
+;; (terpri)
+;; (loop for state in (first A) do
+;;     (print_state state))
+;; (terpri)
+;; (format t "Expanded  nodes: ~d" (third  A))
+;; (terpri)
+;; (format t "Generated nodes: ~d" (fourth A))
+;; (terpri)
+;; (format t "Elapsed seconds ~f" (get_elapsed_seconds))
+;; (terpri)
+;; (format t "Branches pruned ~d" *nodes_cut*)
