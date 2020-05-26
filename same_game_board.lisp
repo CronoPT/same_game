@@ -18,7 +18,7 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 10)
+(defvar *time_limit_seconds* 120)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -65,7 +65,6 @@
 
 (defun give_filter_on_best_score (best_score)
     (lambda (state)
-        ;(print best_score)
         (<= (+ (max_score (state-board state)) (state-score state)) best_score )
     )
 )
@@ -878,6 +877,23 @@
     (> (node_discrepancy-heuristic node1) (node_discrepancy-heuristic node2))
 )
 
+(defun espaco-expande-no (espaco no best_node problema)
+  "Expande o no recebido no espaco, actualizando a estrutura do
+  espaco."
+  ;; Comecamos por gerar todos os sucessores do estado correspondente
+  ;; ao no recebido
+  (let ((sucessores (problema-gera-sucessores problema
+                            (no-estado no) 
+                            (give_filter_function_on_best_score (state-score (no-estado best_node))))))
+    ;; O no ja foi expandido, por isso passa para os expandidos
+    (junta-no-expandido espaco no)
+    
+    ;; Finalmente, juntamos aos abertos os nos cujos estados ainda nao
+    ;; existem no espaco (os nos mais recentes vao para o fim da
+    ;; lista)
+    (junta-nos-gerados espaco
+		       (cria-nos-sucessores espaco no sucessores))))
+
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;!
 ;;! Now we keep track of the best node so we can return it ata any time
@@ -909,10 +925,8 @@
 	        (when (>= (state-score (no-estado proximo-no)) (state-score (no-estado best_node)))
                 (setf best_node proximo-no))     ; ! the expanded node is the best till know
             ;; Caso contrario, devemos expandir o no
-            (espaco-expande-no espaco proximo-no))))
+            (espaco-expande-no espaco proximo-no best_node problema))))
 )
-
-
 
 ;****************************
 ;* ALGORITHMS                         
@@ -948,7 +962,7 @@
                     (generate_nodes
                         (problema-gera-sucessores problema
                             (no-estado next_node) 
-                            (give_filter_function_on_best_score (state-score (no-estado best_node))) )
+                            (give_filter_function_on_best_score (state-score (no-estado best_node))))
                              next_node))
 
                 (if (null closed)
@@ -988,10 +1002,6 @@
 )
 
 
-
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;!!!!
 ;;
 ;;
@@ -1013,7 +1023,11 @@
                         ((funcall objectivo?) (return-from iterative_deepning_A* (da-caminho best_node))) 
                         (t
                             (let ((max-score 0) (result nil))
-                                (loop for suc_node in (generate_nos (problema-gera-sucessores problema estado) node) do
+                                (loop for suc_node in (generate_nos 
+                                            (problema-gera-sucessores problema
+                                                (no-estado node) 
+                                                (give_filter_function_on_best_score (state-score (no-estado best_node))))
+                                                node) do
                                     (setf result (prof suc_node score-min (+ depth 1)))
                                     (if (< max-score result ) (setf max-score result))
                                     (if (< (state-score (no-estado best_node)) (state-score (no-estado suc_node)))
@@ -1032,19 +1046,21 @@
     )
 )
 
-
-
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
 ;;! Sends a random probe down the state tree
 ;;!
-(defun send_probe (problema)
+(defun send_probe (problema best_solution)
     (let*(  (next_node (cria-no (problema-estado-inicial problema) nil))
             (successores nil)
             (to_expand 0)
             (objectivo? (problema-objectivo? problema)))
+        (when (null best_solution)
+            (setf best_solution (list (problema-estado-inicial problema))))
         (loop
-            (setf successores (problema-gera-sucessores problema (no-estado next_node)))
+            (setf successores (problema-gera-sucessores problema
+                                    (no-estado next_node) 
+                                    (give_filter_function_on_best_score (state-score (car (last best_solution))))))
             (when (or (null successores) (funcall objectivo?))
                 (return-from send_probe (da-caminho next_node)))
             (setf to_expand (random (list-length successores)))
@@ -1066,7 +1082,7 @@
         (loop
             (when (funcall objectivo?)
                 (return-from iterative_sampling_search best_solution))
-            (setf current_solution (send_probe problema))
+            (setf current_solution (send_probe problema best_solution))
             (if (null best_solution)
                 (setf best_solution current_solution)
                 (when (new_best_than_old current_solution best_solution)
@@ -1106,9 +1122,12 @@
 ;; yet been reached - it will return all the successors but every one
 ;; except for the best, will have the field 'discrepancies' incremented
 ;;
-(defun successores_non_max_discrepancy (to_expand problema)
+(defun successores_non_max_discrepancy (to_expand problema best_node)
     (let*(  (heuristic (problema-heuristica problema))
-            (successores (generate_nodes_discrepancy_non_max (problema-gera-sucessores problema (no-estado to_expand)) to_expand heuristic)))
+            (successores (generate_nodes_discrepancy_non_max (problema-gera-sucessores problema
+                                (no-estado to_expand) 
+                                (give_filter_function_on_best_score (state-score (no-estado best_node)))) 
+                                                             to_expand heuristic)))
         (when (null successores)
             (return-from successores_non_max_discrepancy nil))
         (setf successores (sort successores 'compare_nodes))
@@ -1145,7 +1164,7 @@
                     (setf best_node next_node))
                 (if (>= (node_discrepancy-discrepancies next_node) allowed_discrepancies)
                     (stack_push stack (successores_max_discrepancy next_node problema))
-                    (stack_push stack (successores_non_max_discrepancy next_node problema))
+                    (stack_push stack (successores_non_max_discrepancy next_node problema best_node))
                 )
             )
             (incf allowed_discrepancies 1)
@@ -1344,69 +1363,16 @@
                    
 ;; (print (resolve-same-game boardinho 'a*.melhor.heuristica))
 
-(defun resolve-same-game-for-test (board strategy)
-    (let*(  (initial_state (make-state :board board :score 0 :move nil))
-            (problema (cria-problema initial_state '(generate_successors) 
-                                                   :objectivo? #'is_it_goal
-                                                   :custo #'cost_same_game
-                                                   :heuristica #'h6))
-            (solution nil)
-        )
+(defvar initial_state (make-state :board b3 :score 0 :move nil))
 
-        (cond 
-            ((string-equal strategy "melhor.abordagem")
-                (format t "What the hell am I doing here? Cause I'm a creep...."))
-            ((string-equal strategy "a*.melhor.heuristica")
-                (setf solution (procura problema 'a*)))
-            ((string-equal strategy "a*.melhor.heuristica.alternativa")
-                (setf (problema-heuristica problema) #'h5)
-                (setf solution (procura problema 'a*)))
-            ((string-equal strategy "sondagem.iterativa")
-                (setf solution (procura problema 'iterative_sampling)))
-            ((string-equal strategy "abordagem.alternativa")
-                (setf solution (procura problema 'limited_discrepancy)))
-            ((string-equal strategy "profundidade.primeiro")
-                (setf solution (procura problema 'profundidade)))
-            ((string-equal strategy "largura.primeiro")
-                (setf solution (procura problema 'largura)))
-            ((string-equal strategy "profundidade.iterativa")
-                (setf solution (procura problema 'profundidade-iterativa)))
-            ((string-equal strategy "ida*.melhor.heuristica")
-                (setf solution (procura problema 'ida*)))
-            ((string-equal strategy "a*.melhor.heuristica.alternativa")
-                (setf (problema-heuristica problema) #'h5)
-                (setf solution (procura problema 'ida*)))
-        )
-
-        solution
-    )
-)
-
-(defvar *approaches* '("a*.melhor.heuristica" "a*.melhor.heuristica.alternativa"
-                       "sondagem.iterativa" "abordagem.alternativa" "profundidade.primeiro"
-                       "largura.primeiro" "profundidade.iterativa" "ida*.melhor.heuristica"
-                       "a*.melhor.heuristica.alternativa"))
-
-(defvar *shapes* '((4 4) (4 4)))
-
-(defvar *tries_per_shape* 5)
-
-(defvar *colors* 3)
-
-                   
-;(print (resolve-same-game boardinho 'a*.melhor.heuristica))
-
-
- (defvar initial_state (make-state :board boardinho :score 0 :move nil))
-
- (defvar problema (cria-problema initial_state '(generate_successors) 
-                     :objectivo? #'is_it_goal
-                     :custo #'cost_same_game
-                     :heuristica #'h6))
+(defvar problema (cria-problema initial_state '(generate_successors) 
+                    :objectivo? #'is_it_goal
+                    :custo #'cost_same_game
+                    :heuristica #'h6))
 
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'profundidade)))
+(time (defvar A (procura problema 'iterative_sampling)))
 (terpri)
 (print "RESULTS")
 (terpri)
