@@ -1,0 +1,219 @@
+Expanded  nodes: 5750
+Generated nodes: 101991
+Elapsed seconds 60.1913
+Branches pruned 5088
+Strategy: a*.melhor.heuristica
+Shape: 5x5
+Mean Expanded Nodes --> 56.333332
+Mean Generated Nodes -> 144.0
+Mean Score -----------> 83.0
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 5x5
+Mean Expanded Nodes --> 104.666664
+Mean Generated Nodes -> 250.66667
+Mean Score -----------> 77.333336
+
+Strategy: sondagem.iterativa
+Shape: 5x5
+Mean Expanded Nodes --> 74986.664
+Mean Generated Nodes -> 334176.66
+Mean Score -----------> 74.666664
+
+Strategy: abordagem.alternativa
+Shape: 5x5
+Mean Expanded Nodes --> 82737.336
+Mean Generated Nodes -> 203399.33
+Mean Score -----------> 99.666664
+
+Strategy: profundidade.primeiro
+Shape: 5x5
+Mean Expanded Nodes --> 49.0
+Mean Generated Nodes -> 97.666664
+Mean Score -----------> 76.666664
+
+Strategy: largura.primeiro
+Shape: 5x5
+Mean Expanded Nodes --> 59.0
+Mean Generated Nodes -> 108.333336
+Mean Score -----------> 87.666664
+
+Strategy: profundidade.iterativa
+Shape: 5x5
+Mean Expanded Nodes --> 211.66667
+Mean Generated Nodes -> 514.6667
+Mean Score -----------> 119.666664
+
+Strategy: ida*.melhor.heuristica
+Shape: 5x5
+Mean Expanded Nodes --> 95.666664
+Mean Generated Nodes -> 168.66667
+Mean Score -----------> 72.666664
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 5x5
+Mean Expanded Nodes --> 39.0
+Mean Generated Nodes -> 107.333336
+Mean Score -----------> 101.333336
+
+Strategy: a*.melhor.heuristica
+Shape: 10x10
+Mean Expanded Nodes --> 11615.333
+Mean Generated Nodes -> 32377.0
+Mean Score -----------> 947.6667
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 10x10
+Mean Expanded Nodes --> 10829.667
+Mean Generated Nodes -> 49243.332
+Mean Score -----------> 1354.6666
+
+Strategy: sondagem.iterativa
+Shape: 10x10
+Mean Expanded Nodes --> 14679.667
+Mean Generated Nodes -> 189918.0
+Mean Score -----------> 1319.6666
+
+Strategy: abordagem.alternativa
+Shape: 10x10
+Mean Expanded Nodes --> 17246.0
+Mean Generated Nodes -> 65021.668
+Mean Score -----------> 1563.6666
+
+Strategy: profundidade.primeiro
+Shape: 10x10
+Mean Expanded Nodes --> 29044.334
+Mean Generated Nodes -> 117846.0
+Mean Score -----------> 581.3333
+
+Strategy: largura.primeiro
+Shape: 10x10
+Mean Expanded Nodes --> 958.0
+Mean Generated Nodes -> 13616.0
+Mean Score -----------> 524.0
+
+Strategy: profundidade.iterativa
+Shape: 10x10
+Mean Expanded Nodes --> 11337.667
+Mean Generated Nodes -> 161191.33
+Mean Score -----------> 688.0
+
+Strategy: ida*.melhor.heuristica
+Shape: 10x10
+Mean Expanded Nodes --> 24512.666
+Mean Generated Nodes -> 108055.664
+Mean Score -----------> 687.6667
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 10x10
+Mean Expanded Nodes --> 11480.333
+Mean Generated Nodes -> 29875.666
+Mean Score -----------> 871.6667
+
+Strategy: a*.melhor.heuristica
+Shape: 15x15
+Mean Expanded Nodes --> 9307.0
+Mean Generated Nodes -> 26713.334
+Mean Score -----------> 5040.3335
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 15x15
+Mean Expanded Nodes --> 9214.667
+Mean Generated Nodes -> 35088.668
+Mean Score -----------> 5283.6665
+
+Strategy: sondagem.iterativa
+Shape: 15x15
+Mean Expanded Nodes --> 4134.3335
+Mean Generated Nodes -> 111043.664
+Mean Score -----------> 4547.6665
+
+Strategy: abordagem.alternativa
+Shape: 15x15
+Mean Expanded Nodes --> 4819.0
+Mean Generated Nodes -> 32765.666
+Mean Score -----------> 6346.0
+
+Strategy: profundidade.primeiro
+Shape: 15x15
+Mean Expanded Nodes --> 27656.334
+Mean Generated Nodes -> 72215.336
+Mean Score -----------> 884.6667
+
+Strategy: largura.primeiro
+Shape: 15x15
+Mean Expanded Nodes --> 405.66666
+Mean Generated Nodes -> 13768.667
+Mean Score -----------> 730.3333
+
+Strategy: profundidade.iterativa
+Shape: 15x15
+Mean Expanded Nodes --> 2907.6667
+Mean Generated Nodes -> 104637.664
+Mean Score -----------> 669.0
+
+Strategy: ida*.melhor.heuristica
+Shape: 15x15
+Mean Expanded Nodes --> 24612.334
+Mean Generated Nodes -> 63801.332
+Mean Score -----------> 804.3333
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 15x15
+Mean Expanded Nodes --> 8779.333
+Mean Generated Nodes -> 29936.666
+Mean Score -----------> 3726.6667
+
+Strategy: a*.melhor.heuristica
+Shape: 30x30
+Mean Expanded Nodes --> 53.666668
+Mean Generated Nodes -> 3328.6667
+Mean Score -----------> 39063.0
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 30x30
+Mean Expanded Nodes --> 192.33333
+Mean Generated Nodes -> 3771.6667
+Mean Score -----------> 37895.332
+
+Strategy: sondagem.iterativa
+Shape: 30x30
+Mean Expanded Nodes --> 234.33333
+Mean Generated Nodes -> 19697.334
+Mean Score -----------> 20981.0
+
+Strategy: abordagem.alternativa
+Shape: 30x30
+Mean Expanded Nodes --> 28.666666
+Mean Generated Nodes -> 3459.6667
+Mean Score -----------> 1187.6666
+
+Strategy: profundidade.primeiro
+Shape: 30x30
+Mean Expanded Nodes --> 5047.3335
+Mean Generated Nodes -> 21201.666
+Mean Score -----------> 5154.6665
+
+Strategy: largura.primeiro
+Shape: 30x30
+Mean Expanded Nodes --> 54.333332
+Mean Generated Nodes -> 8885.667
+Mean Score -----------> 349.33334
+
+Strategy: profundidade.iterativa
+Shape: 30x30
+Mean Expanded Nodes --> 144.66667
+Mean Generated Nodes -> 22615.0
+Mean Score -----------> 428.66666
+
+Strategy: ida*.melhor.heuristica
+Shape: 30x30
+Mean Expanded Nodes --> 4267.0
+Mean Generated Nodes -> 19099.334
+Mean Score -----------> 4910.3335
+
+Strategy: a*.melhor.heuristica.alternativa
+Shape: 30x30
+Mean Expanded Nodes --> 105.666664
+Mean Generated Nodes -> 4129.6665
+Mean Score -----------> 29737.334

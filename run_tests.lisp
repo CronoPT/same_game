@@ -43,9 +43,9 @@
                        "largura.primeiro" "profundidade.iterativa" "ida*.melhor.heuristica"
                        "a*.melhor.heuristica.alternativa"))
 
-(defvar *shapes* '((4 4) (4 4)))
+(defvar *shapes* '((5 5) (10 10) (15 15) (30 30)))
 
-(defvar *tries_per_shape* 5)
+(defvar *tries_per_shape* 3)
 
 (defvar *colors* 3)
 

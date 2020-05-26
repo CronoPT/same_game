@@ -2,7 +2,6 @@
 ;;!!!!!  PACKAGE
 ;(in-package :user)
 
-;; (load "procura.lisp")
 (load "procura.lisp")
 
 ;************************************************************************
@@ -18,7 +17,7 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 120)
+(defvar *time_limit_seconds* 60)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -31,7 +30,7 @@
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 1000000)
+(defvar *memory_limit_megabytes* 1000000000)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -58,19 +57,32 @@
         (floor mb_bytes 1000000)
     )
 )
+
 ;************************************************************************
 ;*                          FILTROS - SUCCESSORS CUT                    *
 ;************************************************************************
-
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Can the state ever reach the best_score?
+;;
 (defun give_filter_on_best_score (best_score)
     (lambda (state)
         (<= (+ (max_score (state-board state)) (state-score state)) best_score )
     )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Global variable so we can keep track of how many successores were cut
+;;
 (defvar *nodes_cut* 0)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Every state that can't possibly be as good as best score (because a 
+;; all the pieces that are there are not enough to reach that threshold)
+;; gets cut
+;;
 (defun give_filter_function (filtro)
     (lambda (successors) 
         (let (  (prev successors) (after (remove-if filtro successors))) 
@@ -87,11 +99,13 @@
 ;;     )
 ;; )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Filters successor list by a given criteria
+;;
 (defun give_filter_function_on_best_score (best_score)
-    (give_filter_function
-        (give_filter_on_best_score best_score))
+    (give_filter_function (give_filter_on_best_score best_score))
 )
-
 
 ;************************************************************************
 ;*                      STACK STRUCT - USED IN DFS                      *
@@ -175,7 +189,6 @@
     )
 )
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Set the content in the board at position (l, c) with val
@@ -206,8 +219,11 @@
     )
 )
 
-
-  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; If all the peaces of the same cluster were in a cluster together what
+;; would be the total score of playing those clusters?
+;;  
 (defun max_score (board)
     (let
         ( (ht (make-hash-table)) (max_score 0))
@@ -285,6 +301,12 @@
     )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A useful function to sort positions by line
+;; If we do not sort positions changed by line, our algorithm does not
+;; work in specific situations
+;;
 (defun compare (pos1 pos2)
     (< (first pos1) (first pos2))
 )
@@ -473,7 +495,6 @@
     (state-score state)
 )
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Prints to the screen the board and score of a given state
@@ -523,9 +544,6 @@
     )
 )
 
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; RETURNS a list with actions ((l,c) (l,c)...). One actions per cluster
@@ -546,12 +564,9 @@
     )   
 )
 
-
-
 ;************************************************************************
 ;*                       GENERATE SUCCESSORS                            *
 ;************************************************************************
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Redifiniton from procura.lisp so we can pass a filtering function 
@@ -567,6 +582,14 @@
     (incf *nos-gerados* (length sucessores))
     
     (funcall filtro sucessores)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A useful function to sort states
+;;
+(defun compare_states (state1 state2)
+    (> (state-score state1) (state-score state2))
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -589,18 +612,13 @@
             (nconc successors (list (do_action_clone state action)))
         )
       )
-      successors
+      (sort successors 'compare_states)
     )
 )
-
-
-
-
 
 ;************************************************************************
 ;*                             HEURISTICS                               *
 ;************************************************************************
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Tells how many pieces there are in the board still. It will be 
@@ -731,8 +749,7 @@
 ;;  from 0 to 100%. The idea is to prioritize the growth of clusters
 ;;  but avoiding getting stuck at a potential state with a large cluster,
 ;;  (this is the one which maximized the score of b3 at 2800 - but the score varies)
-;;
-;;!for VASCO: test this and ask TO why this works. 
+;; 
 (defun h6 (state)
     (let* ((board (state-board state))
           (successors (generate_possible_actions board))
@@ -752,12 +769,6 @@
          expected_score  ;important. This is an incentive to actually explore the state and not only generate it
     )
 )
-
-;;;;;
-;;  !PARA APGAR
-;;  HEURISTICA DE TESTE 
-;;
-(defun h7 (state) (score_move(get_remaining_pieces (state-board state))))
  
 ;************************************************************************
 ;*                         SEARCH ALGORITHMS                            *
@@ -799,7 +810,10 @@
             ) successores)
 )
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; From a list of states and their parent node, generates a list of nodes
+;;
 (defun generate_nos (successores father)
     (mapcar (lambda (succ) 
                 (make-no
@@ -842,6 +856,17 @@
 ;****************************
 ;* AUX FUNCTIONS                           
 ;****************************
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Given two nodes, returns the best one in terms of score of its state
+;; Useful to keep track of the best node
+;;
+(defun determine_best_node (node1 node2)
+    (if (> (state-score (no-estado node1)) (state-score (no-estado node2)))
+        node1
+        node2
+    )
+)
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;! 
@@ -877,22 +902,35 @@
     (> (node_discrepancy-heuristic node1) (node_discrepancy-heuristic node2))
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; We have to reimplement this function so we can do evaluation of the
+;; node in generation, not expantion
+;;
 (defun espaco-expande-no (espaco no best_node problema)
   "Expande o no recebido no espaco, actualizando a estrutura do
   espaco."
   ;; Comecamos por gerar todos os sucessores do estado correspondente
   ;; ao no recebido
-  (let ((sucessores (problema-gera-sucessores problema
+    (let(   (sucessores (problema-gera-sucessores problema
                             (no-estado no) 
-                            (give_filter_function_on_best_score (state-score (no-estado best_node))))))
-    ;; O no ja foi expandido, por isso passa para os expandidos
-    (junta-no-expandido espaco no)
-    
-    ;; Finalmente, juntamos aos abertos os nos cujos estados ainda nao
-    ;; existem no espaco (os nos mais recentes vao para o fim da
-    ;; lista)
-    (junta-nos-gerados espaco
-		       (cria-nos-sucessores espaco no sucessores))))
+                            (give_filter_function_on_best_score (state-score (no-estado best_node)))))
+            (nos-sucessores nil))
+        ;; O no ja foi expandido, por isso passa para os expandidos
+        (junta-no-expandido espaco no)
+        
+        ;; Finalmente, juntamos aos abertos os nos cujos estados ainda nao
+        ;; existem no espaco (os nos mais recentes vao para o fim da
+        ;; lista)
+        (setf nos-sucessores (cria-nos-sucessores espaco no sucessores))
+        (junta-nos-gerados espaco nos-sucessores)
+
+        (if (not (null nos-sucessores))
+            (determine_best_node best_node (nth 0 nos-sucessores))
+            best_node
+        )
+    )             
+)
 
 ;;!;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;!
@@ -922,10 +960,9 @@
 	            (return (da-caminho best_node))) ; ! return from best node
             (when (null best_node)
                 (setf best_node proximo-no))
-	        (when (>= (state-score (no-estado proximo-no)) (state-score (no-estado best_node)))
-                (setf best_node proximo-no))     ; ! the expanded node is the best till know
+
             ;; Caso contrario, devemos expandir o no
-            (espaco-expande-no espaco proximo-no best_node problema))))
+            (setf best_node (espaco-expande-no espaco proximo-no best_node problema)))))
 )
 
 ;****************************
@@ -946,7 +983,9 @@
                                            :depth 0))
             (best_node initial_node)
             (next_node nil)
-            (objetivo? (problema-objectivo? problema)))
+            (objetivo? (problema-objectivo? problema))
+            (successor_nodes nil)
+            (best_successor  nil))
         (stack_push stack initial_node)
         (loop
             (when (stack_empty stack)
@@ -955,16 +994,16 @@
             (unless (or (member next_node closed) (> (node_depth-depth next_node) profundidade-maxima))
                 (when (funcall objetivo?)
                     (return-from depth_first_search (da-caminho best_node)))
-                (when (>= (state-score (no-estado next_node)) (state-score (no-estado best_node)))
-                    (setf best_node next_node))
-
-                (stack_push stack
-                    (generate_nodes
-                        (problema-gera-sucessores problema
-                            (no-estado next_node) 
-                            (give_filter_function_on_best_score (state-score (no-estado best_node))))
-                             next_node))
-
+                (setf successor_nodes (generate_nodes
+                                        (problema-gera-sucessores problema
+                                            (no-estado next_node) 
+                                            (give_filter_function_on_best_score (state-score (no-estado best_node))))
+                                        next_node))
+                (when (not (null successor_nodes))
+                    (setf best_successor (nth 0 successor_nodes))
+                    (setf best_node (determine_best_node best_node best_successor))    
+                )
+                (stack_push stack successor_nodes)
                 (if (null closed)
                     (setf closed (list next_node))
                     (push next_node (cdr (last closed))) ; add expanded node to closed
@@ -1002,9 +1041,9 @@
 )
 
 
-;;;;;;;;;;;;;;;;;;;;;;!!!!
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;
+;; Iterative Deepening A*  
 ;;
 (defun iterative_deepning_A* (problema)                 
     (let* ((initial_node  (make-no 
@@ -1017,22 +1056,29 @@
             ((prof (node score-min depth)
                   (let* 
                     ( (estado (no-estado node))
-                    (current_score (+ (state-score estado) (funcall heur estado))));; f = g + h
+                      (current_score (+ (state-score estado) (funcall heur estado))));; f = g + h
                     (cond 
                         ((< current_score score-min) current_score)  ;return estimated cost.
                         ((funcall objectivo?) (return-from iterative_deepning_A* (da-caminho best_node))) 
                         (t
-                            (let ((max-score 0) (result nil))
-                                (loop for suc_node in (generate_nos 
+                            (let(   (max-score 0) (result nil)
+                                    (successor_nodes (generate_nos 
                                             (problema-gera-sucessores problema
                                                 (no-estado node) 
                                                 (give_filter_function_on_best_score (state-score (no-estado best_node))))
-                                                node) do
+                                                node))
+                                )
+                                (loop for suc_node in successor_nodes do
                                     (setf result (prof suc_node score-min (+ depth 1)))
                                     (if (< max-score result ) (setf max-score result))
                                     (if (< (state-score (no-estado best_node)) (state-score (no-estado suc_node)))
-                                        (setf best_node suc_node)))
-                                max-score )))) 
+                                        (setf best_node suc_node))
+                                )
+                                max-score
+                            )
+                        )
+                    )
+                ) 
             ))
             (let 
                 ((score-min most-positive-fixnum))
@@ -1054,15 +1100,21 @@
     (let*(  (next_node (cria-no (problema-estado-inicial problema) nil))
             (successores nil)
             (to_expand 0)
-            (objectivo? (problema-objectivo? problema)))
+            (objectivo? (problema-objectivo? problema))
+            (best_node nil))
         (when (null best_solution)
             (setf best_solution (list (problema-estado-inicial problema))))
         (loop
             (setf successores (problema-gera-sucessores problema
                                     (no-estado next_node) 
                                     (give_filter_function_on_best_score (state-score (car (last best_solution))))))
+            (when (null best_node)
+                (setf best_node (cria-no (nth 0 successores) next_node)))
+            (when (not (null successores))
+                (setf best_node (determine_best_node best_node (cria-no (nth 0 successores) next_node))))
             (when (or (null successores) (funcall objectivo?))
-                (return-from send_probe (da-caminho next_node)))
+                (return-from send_probe (da-caminho best_node)))
+
             (setf to_expand (random (list-length successores)))
             (setf next_node (cria-no (nth to_expand successores) next_node))
         )
@@ -1138,6 +1190,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+;; A comparison function to sort nodes by the score of their states
+;;
+(defun compare_nodes_score (node1 node2)
+    (> (state-score (no-estado node1)) (state-score (no-estado node2)))
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 ;; A wierd version of Limited Discrepancy Search proposed by Harvey that
 ;; supports an arbitrary branching factor.
 ;;
@@ -1149,7 +1209,8 @@
             (best_node initial_node)
             (next_node nil)
             (objectivo? (problema-objectivo? problema))
-            (allowed_discrepancies 0))
+            (allowed_discrepancies 0)
+            (successor_nodes))
         (stack_push stack initial_node)
         (loop
             (setf stack (stack_create))
@@ -1160,12 +1221,14 @@
                 (when (funcall objectivo?)
 	                (return-from limited_discrepancy_search (da-caminho best_node)))
                 (setf next_node (stack_pop stack))
-                (when (>= (state-score (no-estado next_node)) (state-score (no-estado best_node)))
-                    (setf best_node next_node))
                 (if (>= (node_discrepancy-discrepancies next_node) allowed_discrepancies)
-                    (stack_push stack (successores_max_discrepancy next_node problema))
-                    (stack_push stack (successores_non_max_discrepancy next_node problema best_node))
-                )
+                    (setf successor_nodes (successores_max_discrepancy next_node problema))
+                    (setf successor_nodes (successores_non_max_discrepancy next_node problema best_node)))
+                (stack_push stack successor_nodes)
+                (when (not (null successor_nodes))
+                    (if (listp successor_nodes)
+                        (setf best_node (determine_best_node best_node (nth 0 (sort successor_nodes 'compare_nodes_score))))
+                        (setf best_node (determine_best_node best_node successor_nodes))))
             )
             (incf allowed_discrepancies 1)
         )
@@ -1188,13 +1251,7 @@
 
   (flet ((faz-a-procura (problema tipo-procura 
 			 profundidade-maxima espaco-em-arvore?)
-	   ;; Usamos cond em vez de case porque nao sabemos de que
-	   ;; package veem os simbolos (o string-equal funciona com o
-	   ;; symbol-name do simbolo e e' "case-insensitive")
-	   
-	   ;; Actualmente, apenas a procura em largura, o A* e o IDA*
-	   ;; estao a aproveitar a informacao do espaco de estados ser
-	   ;; uma arvore
+
 	   (cond ((string-equal tipo-procura "largura")
                 (largura-primeiro problema 
                             :espaco-em-arvore? espaco-em-arvore?))
@@ -1204,13 +1261,12 @@
                 (iterative_deepening_search problema profundidade-maxima))
             ((string-equal tipo-procura "a*")
                 (a* problema :espaco-em-arvore? espaco-em-arvore?))
-            ((string-equal tipo-procura "ida*") ;;TODO: ida*
+            ((string-equal tipo-procura "ida*")
                 (iterative_deepning_A* problema ))
             ((string-equal tipo-procura "iterative_sampling")
                 (iterative_sampling_search problema))
             ((string-equal tipo-procura "limited_discrepancy")
                 (limited_discrepancy_search problema)))))
-            ;;TODO: Abordagem Alternativa
         
 
     (let(   (*nos-gerados* 0)
@@ -1358,11 +1414,6 @@
                     (1 2 2 2 2) 
                     (1 1 1 1 1)))
 
-;; (print (max_score boardinho))
-
-                   
-;; (print (resolve-same-game boardinho 'a*.melhor.heuristica))
-
 (defvar initial_state (make-state :board b3 :score 0 :move nil))
 
 (defvar problema (cria-problema initial_state '(generate_successors) 
@@ -1372,7 +1423,7 @@
 
 
 (print "SPAM BEGINS")
-(time (defvar A (procura problema 'iterative_sampling)))
+(time (defvar A (procura problema 'profundidade)))
 (terpri)
 (print "RESULTS")
 (terpri)
@@ -1386,7 +1437,3 @@
 (format t "Elapsed seconds ~f" (get_elapsed_seconds))
 (terpri)
 (format t "Branches pruned ~d" *nodes_cut*)
-
-
-
-
