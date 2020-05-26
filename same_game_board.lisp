@@ -18,7 +18,13 @@
 ;;
 ;; Limit execution time of our program in seconds
 ;;
-(defvar *time_limit_seconds* 300)
+(defvar *time_limit_seconds* 10)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Serves as reference to measure execution times of algorithms
+;;
+(defvar *initial_time* 0)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -454,7 +460,7 @@
 ;; ? Or probably will end up returning always false
 ;;
 (defun is_it_goal ()
-    (>= (get_elapsed_seconds) *time_limit_seconds*)
+    (>= (- (get_elapsed_seconds) *initial_time*) *time_limit_seconds*)
 )
 
 
@@ -1190,6 +1196,7 @@
 
     (let(   (*nos-gerados* 0)
 	        (*nos-expandidos* 0)
+            (*initial_time* (get_elapsed_seconds))
 	        (tempo-inicio (get-internal-run-time)))
         (let(   (solucao (faz-a-procura problema tipo-procura
 				    profundidade-maxima
