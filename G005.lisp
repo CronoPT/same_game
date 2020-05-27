@@ -1,9 +1,9 @@
-(load "procura")
 (in-package :user)
-
+(load "procura")
 
 (defvar *nos-gerados*)
 (defvar *nos-expandidos*)
+(defvar *lisp-implementation*)
 
 ;************************************************************************
 ;*                       TIME AND MEMORY HELPERS                        *
@@ -31,7 +31,7 @@
 ;; Limit heap usage of our program in megabytes
 ;; ? The limit is actually 256 MB sould we leave this 2MB padding
 ;;
-(defvar *memory_limit_megabytes* 140)
+(defvar *memory_limit_megabytes* 150)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -41,6 +41,65 @@
     (/ (get-internal-run-time) internal-time-units-per-second)
 )
 
+(defun determine_implementation() 
+    (let(   (room_str (with-output-to-string (*standard-output*) (room nil)))
+            (sbcl_first_word "Dynamic")
+            (first_word nil)
+            (string_word))
+        
+        (setf first_word (loop for char across room_str until (eql char #\space) 
+                            collect char))
+        
+        (setf string_word (make-string (length first_word)))
+        (loop for i from 0 to (- (length first_word) 1)  do
+            (setf (aref string_word i) (nth i first_word)))
+
+        (setf string_word (string-trim '(#\space #\newline) string_word))
+
+        (if (string-equal string_word sbcl_first_word)
+            1
+            2
+        )
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; For steel bank common lisp
+;;
+(defun get_megabytes_used_sbcl ()
+    (let ((room_str (with-output-to-string (*standard-output*) (room nil)))
+          (mb_bytes 0))
+        (loop for char across room_str until (eql char #\newline) do
+            (when (digit-char-p char)
+                (setf mb_bytes (+ (* 10 mb_bytes) (digit-char-p char))))
+        )
+        (floor mb_bytes 1000000)
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; For Clisp
+;;
+(defun get_megabytes_used_clisp ()
+    (let ((room_str (with-output-to-string (*standard-output*) (room nil)))
+          (mb_bytes 0)
+          (counter  0))
+        (loop for char across room_str do
+            (when (digit-char-p char)
+                (setf mb_bytes (+ (* 10 mb_bytes) (digit-char-p char))))
+            (when (eql char #\newline)
+                (incf counter 1)
+                (if (eq 3 counter)
+                    (return-from get_megabytes_used_clisp (floor mb_bytes 1000000))
+                    (setf mb_bytes 0)
+                )
+            )
+        )
+    )
+)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Get used heap memory in megabytes - what i do is get the output
@@ -48,16 +107,11 @@
 ;; which i think it's the number we want
 ;;
 (defun get_megabytes_used ()
-    (let ((room_str (with-output-to-string (*standard-output*) (room nil)))
-          (mb_bytes 0))
-        (loop for char across room_str until (eql char #\newline) do
-            (if (digit-char-p char)
-                (setf mb_bytes (+ (* 10 mb_bytes) (digit-char-p char)))
-            )
-        )
-        (floor mb_bytes 1000000)
-    )
+    (if (eql 1 *lisp-implementation*)
+        (get_megabytes_used_sbcl)   ; 1 is for sbcl
+        (get_megabytes_used_clisp)) ; 2 is for clisp
 )
+
 
 ;****************************
 ;*       STRUCTURES                             
@@ -93,55 +147,6 @@
 )
 
 ;************************************************************************
-;*                          FILTROS - SUCCESSORS CUT                    *
-;************************************************************************
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Can the state ever reach the best_score?
-;;
-(defun give_filter_on_best_score (best_score)
-    (lambda (state)
-        (<= (+ (max_score (state-board state)) (state-score state)) best_score )
-    )
-)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Global variable so we can keep track of how many successores were cut
-;;
-(defvar *nodes_cut* 0)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Every state that can't possibly be as good as best score (because a 
-;; all the pieces that are there are not enough to reach that threshold)
-;; gets cut
-;;
-(defun give_filter_function (filtro)
-    (lambda (successors) 
-        (let (  (prev successors) (after (remove-if filtro successors)))
-            (if (not (eq (length prev) (length after)))
-                (incf *nodes_cut* (- (length prev) (length  after))))
-            after
-        )    
-    )
-)
-
-;; (defun give_filter_function (filtro)
-;;     (lambda (successors) 
-;;         successors
-;;     )
-;; )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Filters successor list by a given criteria
-;;
-(defun give_filter_function_on_best_score (best_score)
-    (give_filter_function (give_filter_on_best_score best_score))
-)
-
-;************************************************************************
 ;*                      STACK STRUCT - USED IN DFS                      *
 ;************************************************************************
 (defstruct stack
@@ -173,6 +178,58 @@
 ;************************************************************************
 ;*                  BOARD - AUXILIARY OPERATIONS                        *
 ;************************************************************************
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Set the content in the board at position (l, c) with val
+;;
+(defun set_pos (lst l c val)
+    (setf (aref lst l c) val)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Get the content in the board at position (l, c)
+;;
+(defun get_pos (lst l c)
+    (aref lst l c)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Score a move that removed n pieces from the board
+;;
+(defun score_move (n)
+    (* (- n 2) (- n 2))
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; If all the peaces of the same cluster were in a cluster together what
+;; would be the total score of playing those clusters?
+;;  
+(defun max_score (board)
+    (let*(  (ht (make-hash-table))
+            (max_score 0)
+            (shape   (array-dimensions board))
+            (lines   (first  shape))
+            (columns (second shape))
+            (piece   nil))
+        (loop for l from 0 to (- lines 1) do
+            (loop for c from 0 to (- columns 1) do
+                (setf piece (get_pos board l c))
+                (when (numberp piece) 
+                    (if (null (gethash piece ht) )
+                        (setf (gethash piece ht) 1)
+                        (incf (gethash piece ht) 1)))
+
+            )
+        )
+        (loop for key being each hash-key of ht do
+            (incf max_score (score_move (gethash key ht))))
+        max_score
+    )
+)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Allows us to build an array board from a list board
@@ -222,22 +279,6 @@
     )
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Set the content in the board at position (l, c) with val
-;;
-(defun set_pos (lst l c val)
-    (setf (aref lst l c) val)
-)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Get the content in the board at position (l, c)
-;;
-(defun get_pos (lst l c)
-    (aref lst l c)
-)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Create copy of board. Can't use copy-list because it will point to the 
@@ -253,35 +294,6 @@
                 (set_pos new_board l c (get_pos board l c))))
         new_board)
 )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; If all the peaces of the same cluster were in a cluster together what
-;; would be the total score of playing those clusters?
-;;  
-(defun max_score (board)
-    (let*(  (ht (make-hash-table))
-            (max_score 0)
-            (shape   (array-dimensions board))
-            (lines   (first  shape))
-            (columns (second shape))
-            (piece   nil))
-        (loop for l from 0 to (- lines 1) do
-            (loop for c from 0 to (- columns 1) do
-                (setf piece (get_pos board l c))
-                (when (numberp piece) 
-                    (if (null (gethash piece ht) )
-                        (setf (gethash piece ht) 1)
-                        (incf (gethash piece ht) 1)))
-
-            )
-        )
-        (loop for key being each hash-key of ht do
-            (incf max_score (score_move (gethash key ht))))
-        max_score
-    )
-)
-
 
 ;************************************************************************
 ;*                  BOARD - CLUSTER OPERATIONS OPERATIONS               *
@@ -532,14 +544,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Score a move that removed n pieces from the board
-;;
-(defun score_move (n)
-    (* (- n 2) (- n 2))
-)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 ;; Apply the action resulting of tapping position on the board and 
 ;; return the score corresponding to that move
 ;;
@@ -583,6 +587,55 @@
                 (setf possible_actions (add_action l c board_clone possible_actions))))
         possible_actions
     )   
+)
+
+;************************************************************************
+;*                          FILTROS - SUCCESSORS CUT                    *
+;************************************************************************
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Can the state ever reach the best_score?
+;;
+(defun give_filter_on_best_score (best_score)
+    (lambda (state)
+        (<= (+ (max_score (state-board state)) (state-score state)) best_score )
+    )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Global variable so we can keep track of how many successores were cut
+;;
+(defvar *nodes_cut* 0)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Every state that can't possibly be as good as best score (because a 
+;; all the pieces that are there are not enough to reach that threshold)
+;; gets cut
+;;
+(defun give_filter_function (filtro)
+    (lambda (successors) 
+        (let (  (prev successors) (after (remove-if filtro successors)))
+            (if (not (eq (length prev) (length after)))
+                (incf *nodes_cut* (- (length prev) (length  after))))
+            after
+        )    
+    )
+)
+
+;; (defun give_filter_function (filtro)
+;;     (lambda (successors) 
+;;         successors
+;;     )
+;; )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Filters successor list by a given criteria
+;;
+(defun give_filter_function_on_best_score (best_score)
+    (give_filter_function (give_filter_on_best_score best_score))
 )
 
 ;************************************************************************
@@ -1269,6 +1322,7 @@
 
     (let(   (*nos-gerados* 0)
 	        (*nos-expandidos* 0)
+            (*lisp-implementation*  (determine_implementation))
             (*initial_time* (get_elapsed_seconds))
 	        (tempo-inicio (get-internal-run-time)))
         (let(   (solucao (faz-a-procura problema tipo-procura

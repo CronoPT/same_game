@@ -84,7 +84,7 @@
                     (1 2 2 2 2) 
                     (1 1 1 1 1)))
 
-(print (resolve-same-game  b4 'melhor.abordagem))
+(print (resolve-same-game  b5 'abordagem.alternativa))
 
 ;; (print (resolve-same-game b3 'abordagem.alternativa))
 
@@ -118,3 +118,10 @@
 ;; (format t "Elapsed seconds ~f" (get_elapsed_seconds))
 ;; (terpri)
 ;; (format t "Branches pruned ~d" *nodes_cut*)
+
+;; (if (eql 1 *lisp-implementation*)
+;;     (format t "~d" (get_megabytes_used_sbcl))   ; 1 is for sbcl
+;;     (format t "~d" (get_megabytes_used_clisp))) ; 2 is for clisp
+;; (fresh-line)
+;; (format t "Gerados: ~d" *nos-gerados*)
+;; (fresh-line)
